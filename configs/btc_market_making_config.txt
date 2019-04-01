@@ -1,1 +1,4 @@
 [MARKET_MAKING_CONFIG]
+order_book_file = /home/lavi/Desktop/RLCryptoMarketMaking/ob.bin
+trades_file = /home/lavi/Desktop/RLCryptoMarketMaking/tr.bin
+initial_investment = 1000.0
