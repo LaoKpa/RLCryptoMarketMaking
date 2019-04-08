@@ -19,7 +19,6 @@ class StateSpace(object):
         self.order_book_state = self.order_book_state_generator.get_order_book_state(book)
 
     def analyze_single_trnsaction(self, settled_transaction):
-        print(settled_transaction)
         if settled_transaction['amount'] == 0:
             return 0
         if settled_transaction['type'] == 'buy':
@@ -94,9 +93,14 @@ class OrderBook(object):
     def sync_trade_clock(self):
         while self.trades[self.trade_count]['timestamp'] <= self.timestamp:
             self.trade_count += 1
+    
+    def get_state(self):
+        self.state_space.current_price = self.get_currnet_price()
+        return self.state_space.get_state()
 
     def make_step(self):
         reward = 0
+        result_list = []
         self.timestamp += 1
         if self.next_order_book['asks'][0]['timestamp'] == self.timestamp:
             self.current_order_book = self.next_order_book
@@ -104,12 +108,11 @@ class OrderBook(object):
             self.order_book_transformer.transform_order_book(self.current_order_book)
         if self.trades[self.trade_count]['timestamp'] == self.timestamp:
             count = 0
-            result_list = []
             while len(self.trades) > self.trade_count and self.trades[self.trade_count]['timestamp'] == self.timestamp:
                 res = self.settle_trade(self.trades[self.trade_count], self.current_order_book)
                 result_list.append(res)
                 self.trade_count += 1
-            self.state_space.update_state(result_list, self.current_order_book)
+        self.state_space.update_state(result_list, self.current_order_book)
         if self.timestamp > self.trades[self.trade_count]['timestamp']:
             raise Exception()
 
@@ -195,30 +198,29 @@ class ActionSpace(object):
     def __init__(self, config_file_path, config_name):
         self.config = ch.ConfigHelper(config_file_path, config_name)
 
-    def network_action_to_alteration(self, price_action_vector, amount_action_vector, book, available_funds):
+    def network_action_to_alteration(self, action_vector, dim, book, available_funds):
         calc_price = lambda x: 1 + (x - 0.5) * 2 / float(10)
         calc_amount = lambda x: x * 0.1
-        ask_price_vector = price_action_vector[:self.config.order_price_scale_size]
-        bid_price_vector = price_action_vector[self.config.order_price_scale_size:]
-        ask_amount_vector = amount_action_vector[:self.config.order_amount_scale_size]
-        bid_amount_vector = amount_action_vector[self.config.order_amount_scale_size:]
-        ask_price_arg = ask_vector.argmax()
-        bid_price_arg = bid_vector.argmax()
+        
+        action_tensor = action_vector.reshape([dim] * 4)
+        ask_price_arg, bid_price_arg, ask_amount_arg, bid_amount_arg = (np.max(action_tensor.argmax(axis=i)) for i in range(4))
+
         current_ask_price = book['asks'][0]['price']
         current_bid_price = book['bids'][0]['price']
-        suggested_ask_price = current_ask * calc_price(ask_arg / float(self.config.order_price_scale_size))
-        suggested_bid_price = current_bid * calc_price(bid_arg / float(self.config.order_price_scale_size))
-        ask_amount_arg = ask_amount_vector.argmax()
-        bid_amount_arg = bid_amount_vector.argmax()
-        suggested_ask_amount = (available_funds / current_ask) * calc_amount(ask_arg / float(self.config.order_amount_scale_size))
-        suggested_bid_amount = (available_funds / current_bid) * calc_amount(bid_arg / float(self.config.order_amount_scale_size))
+
+        suggested_ask_price = current_ask_price * calc_price(ask_price_arg / float(self.config.order_price_scale_size))
+        suggested_bid_price = current_bid_price * calc_price(bid_price_arg / float(self.config.order_price_scale_size))
+
+        suggested_ask_amount = (available_funds / current_ask_price) * calc_amount(ask_amount_arg / float(self.config.order_amount_scale_size))
+        suggested_bid_amount = (available_funds / current_bid_price) * calc_amount(bid_amount_arg / float(self.config.order_amount_scale_size))
+        
         return [(suggested_ask_price, suggested_ask_amount, 'buy'), (suggested_bid_price, suggested_bid_amount, 'sell')]
 
 class Rewarder(object):
     def __init__(self):
         pass
-    def get_reward(inv, prev_inv, funds, prev_funds, price):
-        punishment = lambda x: 5 * ( x ^ 2  + x)+1
+    def get_reward(self, inv, prev_inv, funds, prev_funds, price):
+        punishment = lambda x: 5 * ( x ** 2  + x)+1
         diff_inv = inv - prev_inv
         diff_funds = funds - prev_funds
         relative_inv = (inv*price / (funds + inv*price))
@@ -233,24 +235,29 @@ class MarketMakingGame(object):
         self.order_index = None
     
     def get_state(self):
-        return self.order_book.state_space.get_state()
+        return self.order_book.get_state()
 
-    def make_action(self, price_action_vector, amount_action_vector):
-        ask_order, bid_order = self.action_space.network_action_to_alteration(price_action_vector, amount_action_vector,
+    def make_action(self, action_vector):
+        ask_order, bid_order = self.action_space.network_action_to_alteration(action_vector, 5,
         self.order_book.current_order_book, self.order_book.state_space.available_funds)
         if self.order_index != None:
-            self.order_book.order_book_transformer.delete_order()
-            self.order_book.order_book_transformer.delete_order()
+            self.order_book.order_book_transformer.delete_order(self.order_index['ask'])
+            self.order_book.order_book_transformer.delete_order(self.order_index['bid'])
         ask_order_index = self.order_book.order_book_transformer.add_order(ask_order[0], ask_order[1], ask_order[2])
         bid_order_index = self.order_book.order_book_transformer.add_order(bid_order[0], bid_order[1], bid_order[2])
         self.order_index = {'ask':ask_order_index, 'bid':bid_order_index}
-        
         tmp_inv = self.order_book.state_space.inventory
         tmp_funds = self.order_book.state_space.available_funds
-        
         self.order_book.make_step()
-        reward = self.rewarder(self.order_book.state_space.inventory, tmp_inv, self.order_book.state_space.available_funds, tmp_funds, self.order_book.get_currnet_price())
-        
+        reward = self.rewarder.get_reward(self.order_book.state_space.inventory, tmp_inv,
+                                          self.order_book.state_space.available_funds, tmp_funds,
+                                          self.order_book.get_currnet_price())
+        return {'state':self.order_book.get_state(), 'reward':reward}
+
+    def make_empty_action(self):
+        self.order_book.make_step()
+        return {'state':self.order_book.get_state()}
+
     def get_total_reward(self):
         pass
 
@@ -260,10 +267,24 @@ class MarketMakingGame(object):
     def get_total_reward(self):
         pass
 
+class GameWrapper(object):
+    def __init__(self, game, nframes):
+        self.game = game
+        self.nframes = nframes
+        self.current_state = [self.game.make_empty_action()['state'] for i in range(self.nframes)]
+    
+    def make_action(self, action):
+        res = self.game.make_action(action)
+        self.current_state.append(res['state'])
+        self.current_state.pop(0)
+        return {'state':self.current_state, 'reward':res['reward']}
+
 if __name__ == '__main__':
-        ob = OrderBook('configs/btc_market_making_config.txt', 'MARKET_MAKING_CONFIG')
-        [ob.make_step() for i in range(1000)]
-        pdb.set_trace()
+        mm = MarketMakingGame('configs/btc_market_making_config.txt', 'MARKET_MAKING_CONFIG')
+        action = np.zeros(625)
+        action[300] = 1
+        [mm.make_action(action) for i in range(1000)]
+        # pdb.set_trace()
         # ob.order_book_transformer.add_order(4000.5, 1.1, 'sell')
         # print(ob.current_order_book)
         # ob.order_book_transformer.transform_order_book(ob.current_order_book)

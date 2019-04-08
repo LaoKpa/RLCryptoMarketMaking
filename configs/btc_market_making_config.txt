@@ -1,4 +1,12 @@
 [MARKET_MAKING_CONFIG]
-order_book_file = /home/lavi/Desktop/RLCryptoMarketMaking/ob.bin
-trades_file = /home/lavi/Desktop/RLCryptoMarketMaking/tr.bin
+order_book_file = /home/lavi/Desktop/RLCryptoMarketMaking2/ob.bin
+trades_file = /home/lavi/Desktop/RLCryptoMarketMaking2/tr.bin
+
+max_funds = 10000.0
 initial_investment = 1000.0
+
+order_price_scale_size = 5
+order_amount_scale_size = 5
+
+inventory_vector_size = 400
+funds_vector_size = 400
