@@ -3,6 +3,8 @@ import pdb
 import pickle as pk
 import numpy as np
 import config_helper as ch
+import gym
+
 
 class StateSpace(object):
     def __init__(self, config, order_book_state_generator):
@@ -33,12 +35,14 @@ class StateSpace(object):
             raise Exception('Unknown transaction type.')
 
     def get_state(self):
+        done = (self.available_funds <=0) and (self.inventory * self.current_price) <= 0 # change to minimum order limit
         max_inventory = self.available_funds / float(self.current_price) + self.inventory
         inventory_ones_num = (self.inventory / max_inventory) * self.config.inventory_vector_size
         inventory_vector = np.array([float(i < inventory_ones_num) for i in range(self.config.inventory_vector_size)])
         funds_ones_num = (self.available_funds / float(self.config.max_funds)) * self.config.funds_vector_size
         funds_vector = np.array([float(i < funds_ones_num) for i in range(self.config.funds_vector_size)])
-        return (self.order_book_state['asks'], self.order_book_state['bids'], inventory_vector, funds_vector)
+        return ((self.order_book_state['asks'], self.order_book_state['bids'],
+            inventory_vector, funds_vector), done)
 
 class OrderBookState(object):
     def __init__(self, order_book):
@@ -99,6 +103,7 @@ class OrderBook(object):
         return self.state_space.get_state()
 
     def make_step(self):
+        done = False
         reward = 0
         result_list = []
         self.timestamp += 1
@@ -115,6 +120,7 @@ class OrderBook(object):
         self.state_space.update_state(result_list, self.current_order_book)
         if self.timestamp > self.trades[self.trade_count]['timestamp']:
             raise Exception()
+        return done
 
     def settle_trade(self, trade, order_book):
         count = 0
@@ -198,16 +204,15 @@ class ActionSpace(object):
     def __init__(self, config_file_path, config_name):
         self.config = ch.ConfigHelper(config_file_path, config_name)
 
-    def network_action_to_alteration(self, action_vector, dim, book, available_funds):
+    def network_action_to_alteration(self, action, dim, book, available_funds):
         calc_price = lambda x: 1 + (x - 0.5) * 2 / float(10)
         calc_amount = lambda x: x * 0.1
-        
+        action_vector = np.zeros(dim ** 4)
+        action_vector[action] = 1
         action_tensor = action_vector.reshape([dim] * 4)
         ask_price_arg, bid_price_arg, ask_amount_arg, bid_amount_arg = (np.max(action_tensor.argmax(axis=i)) for i in range(4))
-
         current_ask_price = book['asks'][0]['price']
         current_bid_price = book['bids'][0]['price']
-
         suggested_ask_price = current_ask_price * calc_price(ask_price_arg / float(self.config.order_price_scale_size))
         suggested_bid_price = current_bid_price * calc_price(bid_price_arg / float(self.config.order_price_scale_size))
 
@@ -248,23 +253,22 @@ class MarketMakingGame(object):
         self.order_index = {'ask':ask_order_index, 'bid':bid_order_index}
         tmp_inv = self.order_book.state_space.inventory
         tmp_funds = self.order_book.state_space.available_funds
-        self.order_book.make_step()
+        step_done = self.order_book.make_step()
         reward = self.rewarder.get_reward(self.order_book.state_space.inventory, tmp_inv,
                                           self.order_book.state_space.available_funds, tmp_funds,
                                           self.order_book.get_currnet_price())
-        return {'state':self.order_book.get_state(), 'reward':reward}
+        state, done = self.order_book.get_state()
+        return {'state':state, 'reward':reward, 'done':(done or step_done)}
 
     def make_empty_action(self):
         self.order_book.make_step()
-        return {'state':self.order_book.get_state()}
+        state, done = self.order_book.get_state()
+        return {'state':state, 'done':done}
 
     def get_total_reward(self):
         pass
 
     def is_episode_finished(self):
-        pass
-
-    def get_total_reward(self):
         pass
 
 class GameWrapper(object):
@@ -277,16 +281,57 @@ class GameWrapper(object):
         res = self.game.make_action(action)
         self.current_state.append(res['state'])
         self.current_state.pop(0)
-        return {'state':self.current_state, 'reward':res['reward']}
+        return (self.current_state, res['reward'], res['done'])
 
 class SerialGameEnvironment(object):
-    def __init__(self, config_file_path, config_name, nenvs, nframes):
-        self.envs = [GameWrapper(MarketMakingGame(config_file_path,config_name), nframes) for _ in range(nenvs)]
+    def __init__(self, config_file_path, config_name):
+        self.config = ch.ConfigHelper(config_file_path, config_name)
+        self.envs = [GameWrapper(MarketMakingGame(config_file_path,config_name),
+            self.config.num_of_frames) for _ in range(self.config.num_of_envs)]
+        self.initial_state = [env.current_state for env in self.envs]        
+        self.num_envs = self.config.num_of_envs
+        self.action_space = gym.spaces.Discrete(625)
+    
+    def get_initial_state(self):
+        ask_book_env_batch, bid_book_env_batch, inv_env_batch, funds_env_batch = [], [], [], []
+        for env_state in self.initial_state:
+            ask_book_batch, bid_book_batch, inv_batch, funds_batch = [], [], [], []
+            for i in range(self.config.num_of_frames):
+                ask_book, bid_book, inv, funds = env_state[i]
+                ask_book_batch.append(ask_book)
+                bid_book_batch.append(bid_book)
+                inv_batch.append(inv)
+                funds_batch.append(funds)
+            ask_book_env_batch.append(ask_book_batch)
+            bid_book_env_batch.append(bid_book_batch)
+            inv_env_batch.append(inv_batch)
+            funds_env_batch.append(funds_batch)
+        return (np.array(ask_book_env_batch), np.array(bid_book_env_batch),
+            np.array(inv_env_batch), np.array(funds_env_batch))
+
     def step(self, actions):
-        return [env.make_action(a) for env, a in zip(self.envs, actions)]
+        ask_book_env_batch, bid_book_env_batch, inv_env_batch, funds_env_batch,\
+            rewards_env_batch, dones_env_batch = [], [], [], [], [], []
+        for env, a in zip(self.envs, actions):
+            ask_book_batch, bid_book_batch, inv_batch, funds_batch = [], [], [], []
+            state, reward, done = env.make_action(a)
+            for i in range(self.config.num_of_frames):
+                ask_book, bid_book, inv, funds = state[i]
+                ask_book_batch.append(ask_book)
+                bid_book_batch.append(bid_book)
+                inv_batch.append(inv)
+                funds_batch.append(funds)
+            ask_book_env_batch.append(ask_book_batch)
+            bid_book_env_batch.append(bid_book_batch)
+            inv_env_batch.append(inv_batch)
+            funds_env_batch.append(funds_batch)
+            rewards_env_batch.append(reward)
+            dones_env_batch.append(done)
+        return ((np.array(ask_book_env_batch), np.array(bid_book_env_batch),
+            np.array(inv_env_batch), np.array(funds_env_batch)), np.array(rewards_env_batch), np.array(dones_env_batch))
 
 if __name__ == '__main__':
-        mm = SerialGameEnvironment('../configs/btc_market_making_config.txt', 'MARKET_MAKING_CONFIG', 5, 4)
+        mm = SerialGameEnvironment('../configs/btc_market_making_config.txt', 'MARKET_MAKING_CONFIG')
         action = np.zeros(625)
         action[300] = 1
         r = mm.step([action]*5)

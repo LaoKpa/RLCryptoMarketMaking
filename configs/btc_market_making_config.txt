@@ -10,3 +10,23 @@ order_amount_scale_size = 5
 
 inventory_vector_size = 400
 funds_vector_size = 400
+
+num_of_envs = 5
+num_of_frames = 4
+
+nsteps=2048
+total_timesteps=10000000
+gamma=0.99
+lam = 0.95
+vf_coef=0.5
+ent_coef=0.01
+lr = lambda _: 2e-4
+cliprange = lambda _: 0.1
+max_grad_norm = 0.5
+log_interval = 10
+
+
+action_vector_size = 625
+num_of_order_book_entries = 25
+order_book_entrie_rep_dim = 5
+

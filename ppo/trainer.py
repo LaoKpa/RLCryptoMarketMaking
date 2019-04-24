@@ -1,9 +1,26 @@
 
-def learn(policy, env, nsteps, total_timesteps, gamma,lam, vf_coef, ent_coef,
-            lr, cliprange, max_grad_norm, log_interval):
+import time
+
+import numpy as np
+
+import tensorflow as tf
+
+import model as ml
+
+import runner as rn
+
+import market_making_game as env
+
+from baselines.common import explained_variance
+from baselines import logger
+
+def learn(policy, env, config):
 
     noptepochs = 4
     nminibatches = 8
+
+    lr = lambda _: 2e-4
+    cliprange = lambda _: 0.1
 
     if isinstance(lr, float): lr = constfn(lr)
     else: assert callable(lr)
@@ -13,27 +30,15 @@ def learn(policy, env, nsteps, total_timesteps, gamma,lam, vf_coef, ent_coef,
     # Get the nb of env
     nenvs = env.num_envs
 
-    # Get state_space and action_space
-    ob_space = env.observation_space
-    
-    ac_space = env.action_space
-
     # Calculate the batch_size
-    batch_size = nenvs * nsteps # For instance if we take 5 steps and we have 5 environments batch_size = 25
+    batch_size = config.num_of_envs * config.nsteps # For instance if we take 5 steps and we have 5 environments batch_size = 25
 
     batch_train_size = batch_size // nminibatches
 
     assert batch_size % nminibatches == 0
 
     # Instantiate the model object (that creates step_model and train_model)
-    model = Model(policy=policy,
-                ob_space=ob_space,
-                action_space=ac_space,
-                nenvs=nenvs,
-                nsteps=nsteps,
-                ent_coef=ent_coef,
-                vf_coef=vf_coef,
-                max_grad_norm=max_grad_norm)
+    model = ml.Model(policy, config)
 
     # Load the model
     # If you want to continue training
@@ -41,12 +46,12 @@ def learn(policy, env, nsteps, total_timesteps, gamma,lam, vf_coef, ent_coef,
     # model.load(load_path)
 
     # Instantiate the runner object
-    runner = Runner(env, model, nsteps=nsteps, total_timesteps=total_timesteps, gamma=gamma, lam=lam)
+    runner = rn.Runner(env, model, config)
 
     # Start total timer
     tfirststart = time.time()
 
-    nupdates = total_timesteps//batch_size+1
+    nupdates = config.total_timesteps//batch_size+1
 
     for update in range(1, nupdates+1):
         # Start timer
@@ -61,7 +66,7 @@ def learn(policy, env, nsteps, total_timesteps, gamma,lam, vf_coef, ent_coef,
         cliprangenow = cliprange(frac)
 
         # Get minibatch
-        obs, actions, returns, values, neglogpacs = runner.run()
+        ask_book_env, bid_book_env, inv_env, funds_env, returns, actions, values, neglogpacs = runner.run()
 
         # Here what we're going to do is for each minibatch calculate the loss and append it.
         mb_losses = []
@@ -79,10 +84,9 @@ def learn(policy, env, nsteps, total_timesteps, gamma,lam, vf_coef, ent_coef,
             for start in range(0, batch_size, batch_train_size):
                 end = start + batch_train_size
                 mbinds = indices[start:end]
-                slices = (arr[mbinds] for arr in (obs, actions, returns, values, neglogpacs))
+                slices = (arr[mbinds] for arr in (ask_book_env, bid_book_env, inv_env, funds_env, actions, returns, values, neglogpacs))
                 mb_losses.append(model.train(*slices, lrnow, cliprangenow))
-            
-
+    
         # Feedforward --> get losses --> update
         lossvalues = np.mean(mb_losses, axis=0)
 
@@ -92,7 +96,7 @@ def learn(policy, env, nsteps, total_timesteps, gamma,lam, vf_coef, ent_coef,
         # Calculate the fps (frame per second)
         fps = int(batch_size / (tnow - tstart))
 
-        if update % log_interval == 0 or update == 1:
+        if update % config.log_interval == 0 or update == 1:
             """
             Computes fraction of variance that ypred explains about y.
             Returns 1 - Var[y-ypred] / Var[y]
@@ -102,7 +106,7 @@ def learn(policy, env, nsteps, total_timesteps, gamma,lam, vf_coef, ent_coef,
             ev<0  =>  worse than just predicting zero
             """
             ev = explained_variance(values, returns)
-            logger.record_tabular("serial_timesteps", update*nsteps)
+            logger.record_tabular("serial_timesteps", update * config.nsteps)
             logger.record_tabular("nupdates", update)
             logger.record_tabular("total_timesteps", update*batch_size)
             logger.record_tabular("fps", fps)
@@ -119,8 +123,42 @@ def learn(policy, env, nsteps, total_timesteps, gamma,lam, vf_coef, ent_coef,
             # Test our agent with 3 trials and mean the score
             # This will be useful to see if our agent is improving
             test_score = testing(model)
-
             logger.record_tabular("Mean score test level", test_score)
+
             logger.dump_tabular()
             
     env.close()
+
+def testing(model):
+    """
+    We'll use this function to calculate the score on test levels for each saved model,
+    to generate the video version
+    to generate the map version
+    """
+
+    test_env = env.SerialGameEnvironment('../configs/btc_market_making_test_config.txt', 'MARKET_MAKING_CONFIG')
+ 
+    # Play
+    total_score = 0
+    trial = 0
+    
+    # We make 3 trials
+    for trial in range(1):
+        obs = test_env.get_initial_state()
+        done = False
+        score = 0
+        i=0
+        while done == False or i<86400:
+            # Get the action
+            action, _, _ = model.step(*obs)
+            # Take action in env and look the results
+            obs, reward, done = test_env.step(action)
+            print(i)
+            i=i+1
+            score += reward[0]
+        total_score += score
+        trial += 1
+
+    # Divide the score by the number of trials
+    total_test_score = total_score / 3.0
+    return total_test_score

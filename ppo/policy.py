@@ -1,6 +1,7 @@
 
 import numpy as np
 import tensorflow as tf
+import gym
 
 # This function selects the probability distribution over actions
 from baselines.common.distributions import make_pdtype
@@ -12,78 +13,88 @@ def fc_layer(inputs, units, activation_fn=tf.nn.relu, gain=1.0):
                            activation=activation_fn,
                            kernel_initializer=tf.orthogonal_initializer(gain))
 
-
 """
 This object creates the PPO Network architecture
 """
 class MarketMakingPolicy(object):
-    def __init__(self, sess, ob_space, action_space, nbatch, nsteps, reuse = False):
-        # This will use to initialize our kernels
-        gain = np.sqrt(2)
-
+    def __init__(self, sess, config, reuse = False):
+        self.config = config
+        self.sess = sess
         # Based on the action space, will select what probability distribution type
         # we will use to distribute action in our stochastic policy (in our case DiagGaussianPdType
         # aka Diagonal Gaussian, 3D normal distribution
-        self.pdtype = make_pdtype(action_space)
+        self.pdtype = make_pdtype(gym.spaces.Discrete(config.action_vector_size))
 
-        height, weight, channel = ob_space.shape
-        ob_shape = (height, weight, channel)
+        self.input_ask_book = tf.placeholder(tf.float32,
+            [None, self.config.num_of_frames, self.config.num_of_order_book_entries,
+            self.config.order_book_entrie_rep_dim], name="input_ask_book")
+    
+        self.input_bid_book = tf.placeholder(tf.float32,
+            [None, self.config.num_of_frames, self.config.num_of_order_book_entries,
+            self.config.order_book_entrie_rep_dim], name="input_bid_book")
 
-        # Create the input placeholder
-        inputs_ = tf.placeholder(tf.float32, [None, *ob_shape], name="input")
+        self.input_inventory = tf.placeholder(tf.float32, [None, self.config.num_of_frames, self.config.inventory_vector_size,], name="input_inventory")
 
-        # Normalize the images
-        scaled_images = tf.cast(inputs_, tf.float32) / 255.
+        self.input_funds = tf.placeholder(tf.float32, [None, self.config.num_of_frames, self.config.funds_vector_size], name="input_funds")
 
-        """
-        Build the model
-        3 CNN for spatial dependencies
-        Temporal dependencies is handle by stacking frames
-        (Something funny nobody use LSTM in OpenAI Retro contest)
-        1 common FC
-        1 FC for policy
-        1 FC for value
-        """
         with tf.variable_scope("model", reuse = reuse):
-            conv1 = conv_layer(scaled_images, 32, 8, 4, gain)
-            conv2 = conv_layer(conv1, 64, 4, 2, gain)
-            conv3 = conv_layer(conv2, 64, 3, 1, gain)
-            flatten1 = tf.layers.flatten(conv3)
-            fc_common = fc_layer(flatten1, 512, gain=gain)
+            # Dynamic batch length
+            # tf.transpose(tf.stack([lstm(tf.transpose(x,[1,0,2,3])[i]) for i in range(4)]), [1,0,2])
+
+            lstm_ask = tf.keras.layers.CuDNNLSTM(100)
+            
+            lstm_bid = tf.keras.layers.CuDNNLSTM(100)
+
+            transformed_input_inventory = tf.contrib.layers.fully_connected(self.input_inventory, 111)
+
+            transformed_input_funds = tf.contrib.layers.fully_connected(self.input_funds, 111)
+
+            transformed_input_ask_book = tf.contrib.layers.fully_connected(self.input_ask_book, 111)
+
+            transformed_input_bid_book = tf.contrib.layers.fully_connected(self.input_bid_book, 111)
+
+            lstm_output_ask = tf.transpose(tf.stack([lstm_ask(tf.transpose(transformed_input_ask_book,
+                [1,0,2,3])[i]) for i in range(self.config.num_of_frames)]), [1,0,2])
+            
+            lstm_output_bid = tf.transpose(tf.stack([lstm_bid(tf.transpose(transformed_input_bid_book,
+                [1,0,2,3])[i]) for i in range(self.config.num_of_frames)]), [1,0,2])
+            
+            combined_stacked_state = tf.concat([lstm_output_ask, lstm_output_bid,
+                transformed_input_inventory, transformed_input_funds], axis=2)
+
+            transformed_combined_stacked_state = tf.contrib.layers.fully_connected(combined_stacked_state, 111)
+
+            lstm_stacked_state = tf.keras.layers.CuDNNLSTM(100)
+
+            model_output_vec = lstm_stacked_state(transformed_combined_stacked_state)
 
             # This build a fc connected layer that returns a probability distribution
             # over actions (self.pd) and our pi logits (self.pi).
-            self.pd, self.pi = self.pdtype.pdfromlatent(fc_common, init_scale=0.01)
+            self.pd, self.pi = self.pdtype.pdfromlatent(model_output_vec, init_scale=0.01)
 
             # Calculate the v(s)
-            vf = fc_layer(fc_common, 1, activation_fn=None)[:, 0]
-
-        self.initial_state = None
+            self.vf = fc_layer(model_output_vec, 1, activation_fn=None)[:, 0]
 
         # Take an action in the action distribution (remember we are in a situation
         # of stochastic policy so we don't always take the action with the highest probability
         # for instance if we have 2 actions 0.7 and 0.3 we have 30% chance to take the second)
-        a0 = self.pd.sample()
+        self.a0 = self.pd.sample()
 
         # Calculate the neg log of our probability
-        neglogp0 = self.pd.neglogp(a0)
+        self.neglogp0 = self.pd.neglogp(self.a0)
 
-        # Function use to take a step returns action to take and V(s)
-        def step(state_in, *_args, **_kwargs):
+    # Function use to take a step returns action to take and V(s)
+    def step(self, input_ask_book, input_bid_book, input_inventory, input_funds):
+        # return a0, vf, neglogp0
+        return self.sess.run([self.a0, self.vf, self.neglogp0], {self.input_ask_book:input_ask_book, self.input_bid_book:input_bid_book,
+            self.input_inventory:input_inventory, self.input_funds:input_funds})
 
-            # return a0, vf, neglogp0
-            return sess.run([a0, vf, neglogp0], {inputs_: state_in})
+    # Function that calculates only the V(s)
+    def value(self, input_ask_book, input_bid_book, input_inventory, input_funds):
+        return self.sess.run(self.vf, {self.input_ask_book:input_ask_book, self.input_bid_book:input_bid_book,
+            self.input_inventory:input_inventory, self.input_funds:input_funds})
 
-        # Function that calculates only the V(s)
-        def value(state_in, *_args, **_kwargs):
-            return sess.run(vf, {inputs_: state_in})
-
-        # Function that output only the action to take
-        def select_action(state_in, *_args, **_kwargs):
-            return sess.run(a0, {inputs_: state_in})
-
-        self.inputs_ = inputs_
-        self.vf = vf
-        self.step = step
-        self.value = value
-        self.select_action = select_action
+    # Function that output only the action to take
+    def select_action(self, input_ask_book, input_bid_book, input_inventory, input_funds):
+        return self.sess.run(self.a0, {self.input_ask_book:input_ask_book, self.input_bid_book:input_bid_book,
+            self.input_inventory:input_inventory, self.input_funds:input_funds})

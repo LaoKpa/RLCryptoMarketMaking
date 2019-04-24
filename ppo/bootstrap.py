@@ -1,5 +1,4 @@
 
-
 import tensorflow as tf
 import numpy as np
 import gym
@@ -10,6 +9,7 @@ import model
 import trainer
 import policy
 import market_making_game as env
+import config_helper as ch
 
 def main():
     config = tf.ConfigProto()
@@ -20,20 +20,11 @@ def main():
     # Allowing GPU memory growth
     config.gpu_options.allow_growth = True
 
+    bootstrap_config = ch.ConfigHelper('../configs/btc_market_making_config.txt', 'MARKET_MAKING_CONFIG')
+
     with tf.Session(config=config):
-        trainer.learn(policy=policy.MarketMakingPolicy,
-                            env=env.SerialGameEnvironment('../configs/btc_market_making_config.txt', 'MARKET_MAKING_CONFIG', 5, 4),
-                            nsteps=2048, # Steps per environment
-                            total_timesteps=10000000,
-                            gamma=0.99,
-                            lam = 0.95,
-                            vf_coef=0.5,
-                            ent_coef=0.01,
-                            lr = lambda _: 2e-4,
-                            cliprange = lambda _: 0.1, # 0.1 * learning_rate
-                            max_grad_norm = 0.5, 
-                            log_interval = 10
-                            )
+        trainer.learn(policy.MarketMakingPolicy,
+        env.SerialGameEnvironment('../configs/btc_market_making_config.txt', 'MARKET_MAKING_CONFIG'), bootstrap_config)
 
 if __name__ == '__main__':
     main()
