@@ -61,6 +61,10 @@ class OrderBookState(object):
             if i == 0:
                 a_tmp_2 = 1.0
             else:
+                # if book[i-1]['price'] == 0:
+                #     import pdb; pdb.set_trace()
+                # if book[i-1]['amount'] == 0:
+                #     import pdb; pdb.set_trace()
                 a_tmp_2 = (book[i]['price'] * book[i]['amount']) / (book[i-1]['price'] * book[i-1]['amount'])
             ret.append([p_tmp_1-1.0, p_tmp_2-1.0, a_tmp_1-1.0, a_tmp_2-1.0, float(book[i]['my_order'])])
         return np.array(ret)
@@ -106,7 +110,6 @@ class OrderBook(object):
         done = False
         reward = 0
         result_list = []
-        self.timestamp += 1
         if self.next_order_book['asks'][0]['timestamp'] == self.timestamp:
             self.current_order_book = self.next_order_book
             self.next_order_book = pk.load(self.order_book_file_handler)
@@ -120,6 +123,7 @@ class OrderBook(object):
         self.state_space.update_state(result_list, self.current_order_book)
         if self.timestamp > self.trades[self.trade_count]['timestamp']:
             raise Exception()
+        self.timestamp += 1
         return done
 
     def settle_trade(self, trade, order_book):
@@ -136,7 +140,7 @@ class OrderBook(object):
                 count+=1
         except Exception as e:
             return {'amount':0, 'price':0, 'type':0}
-        my_trade_amount = float(trade['amount']) - total_amountOrderBook
+        my_trade_amount = float(trade['amount']) - total_amount
         my_order_amount = order_book[direction][count]['amount']
         if my_trade_amount > 0:
             if my_order_amount - my_trade_amount <= 0:
@@ -206,7 +210,7 @@ class ActionSpace(object):
 
     def network_action_to_alteration(self, action, dim, book, available_funds):
         calc_price = lambda x: 1 + (x - 0.5) * 2 / float(10)
-        calc_amount = lambda x: x * 0.1
+        calc_amount = lambda x: (x + 1) * 0.1
         action_vector = np.zeros(dim ** 4)
         action_vector[action] = 1
         action_tensor = action_vector.reshape([dim] * 4)
@@ -218,7 +222,12 @@ class ActionSpace(object):
 
         suggested_ask_amount = (available_funds / current_ask_price) * calc_amount(ask_amount_arg / float(self.config.order_amount_scale_size))
         suggested_bid_amount = (available_funds / current_bid_price) * calc_amount(bid_amount_arg / float(self.config.order_amount_scale_size))
-        
+
+        if suggested_ask_amount == 0:
+            import pdb; pdb.set_trace()
+        if suggested_bid_amount == 0:
+            import pdb; pdb.set_trace()
+
         return [(suggested_ask_price, suggested_ask_amount, 'buy'), (suggested_bid_price, suggested_bid_amount, 'sell')]
 
 class Rewarder(object):
@@ -228,9 +237,14 @@ class Rewarder(object):
         punishment = lambda x: 5 * ( x ** 2  + x)+1
         diff_inv = inv - prev_inv
         diff_funds = funds - prev_funds
-        relative_inv = (inv*price / (funds + inv*price))
+        relative_inv = (inv * price / (funds + inv * price))
         if diff_inv == 0 and diff_funds == 0:
-            return -punishment(relative_inv)
+            p = -punishment(relative_inv)
+            return p
+        current_net_worth = inv * price + funds
+        prev_net_worth = prev_inv * price + prev_funds
+        gain = current_net_worth - prev_net_worth
+        return gain
 
 class MarketMakingGame(object):
     def __init__(self, config_file_path, config_name):

@@ -148,17 +148,24 @@ def testing(model):
         done = False
         score = 0
         i=0
-        while done == False or i<86400:
+        while done == False and i<86400:
             # Get the action
             action, _, _ = model.step(*obs)
             # Take action in env and look the results
             obs, reward, done = test_env.step(action)
-            print(i)
             i=i+1
             score += reward[0]
+            
+            inv = test_env.envs[0].game.order_book.state_space.inventory
+            price = test_env.envs[0].game.order_book.state_space.current_price
+            funds = test_env.envs[0].game.order_book.state_space.available_funds
+
+            net_worth = funds + inv*price
+            print (net_worth)
+
         total_score += score
         trial += 1
 
     # Divide the score by the number of trials
-    total_test_score = total_score / 3.0
+    total_test_score = total_score / 1.0
     return total_test_score
