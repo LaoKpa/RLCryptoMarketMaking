@@ -6,7 +6,7 @@ import pickle as pk
 import PyQt4.QtGui as qg
 
 class MarketMakingGui(object):
-	def __init__(self):
+	def __init__(self, model):
 		self.ob_fh = open('/home/lavi/Downloads/ob.bin', 'rb')
 		self.app = qg.QApplication(sys.argv)
 		self.create_window()
@@ -70,8 +70,7 @@ class MarketMakingGui(object):
 	def windowResizeCallback(self, obj):
 		self.organize_widgets()
 
-	def callback(self):
-		ob = pk.load(self.ob_fh)
+	def print_order_book(self, ob):
 		for ask, i in zip(ob['asks'], range(len(ob['asks']))):
 			price_item = qg.QTableWidgetItem()
 			price_item.setBackgroundColor(qg.QColor('green'))
@@ -90,6 +89,10 @@ class MarketMakingGui(object):
 			amount_item.setText(str(bid['amount']))
 			self.table.setItem(i,2, price_item)
 			self.table.setItem(i,3, amount_item)
+
+	def callback(self):
+		ob = pk.load(self.ob_fh)
+		self.print_order_book(ob)
 
 def main():
 	mmg = MarketMakingGui()
