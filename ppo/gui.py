@@ -1,71 +1,79 @@
+
 import sys
 import time
-from PyQt4.QtGui import *
 
-app = QApplication(sys.argv) #ignore()
-window = QWidget()
-window.setWindowTitle("Hello World")
-window.show()
-  
-# [Add widgets to the widget]
+import pickle as pk
+import PyQt4.QtGui as qg
 
-# Create some widgets (these won't appear immediately):
-nameLabel = QLabel("Name:")
-nameEdit = QLineEdit()
-addressLabel = QLabel("Address:")
-addressEdit = QTextEdit()
-table = QTableWidget()
+class MarketMakingGui(object):
+	def __init__(self):
+		self.ob_fh = open('/home/lavi/Downloads/ob.bin', 'rb')
+		self.app = qg.QApplication(sys.argv)
+		self.create_window()
+		self.create_button()
+		self.create_labels()
+		self.init_table()
+		self.create_layout()
+		sys.exit(self.app.exec_())
 
-table.setWindowTitle("QTableWidget Example @pythonspot.com")
-table.resize(400, 250)
-table.setRowCount(4)
-table.setColumnCount(2)
-table.setItem(0,0, QTableWidgetItem("Item (1,1)"))
-table.setItem(0,1, QTableWidgetItem("Item (1,2)"))
-table.setItem(1,0, QTableWidgetItem("Item (2,1)"))
-table.setItem(1,1, QTableWidgetItem("Item (2,2)"))
-table.setItem(2,0, QTableWidgetItem("Item (3,1)"))
-table.setItem(2,1, QTableWidgetItem("Item (3,2)"))
-table.setItem(3,0, QTableWidgetItem("Item (4,1)"))
-table.setItem(3,1, QTableWidgetItem("Item (4,2)"))
+	def create_window(self):
+		self.window = qg.QWidget()
+		self.window.setWindowTitle("Hello World")
+		self.window.show()
+	
+	def create_button(self):
+		self.btn = qg.QPushButton(self.window)
+		self.btn.setObjectName("pb")
+		self.btn.clicked.connect(self.callback)
+		self.btn.setText("load book")
+		self.btn.resize(65,25)
+		self.btn.move(100,300)
 
-def timer():
-    when_to_stop = 10 
-    while when_to_stop > 0:
-        m, s = divmod(when_to_stop, 60)
-        h, m = divmod(m, 60)
-        time_left = str(h).zfill(2) + ":" + str(m).zfill(2) + ":" + str(s).zfill(2)
-        time.sleep(1.0)
-        when_to_stop -= 1
-        btn.setText(str(time_left))
-        QtGui.qApp.processEvents()
+	def create_labels(self):
+		self.main_label = qg.QLabel("Market Making Visualisation")
+		font = qg.QFont()
+		font.setPointSize(12)
+		font.setBold(True)
+		font.setWeight(75)
+		self.main_label.setFont(font)
 
-btn = QPushButton(window)
-btn.setObjectName("pb")
-btn.clicked.connect(timer)
-btn.setText("Timer1")
-btn.resize(65,25)
-btn.move(100,300)
+	def init_table(self):
+		self.table = qg.QTableWidget()
+		self.table.setWindowTitle("QTableWidget Example @pythonspot.com")
+		self.table.resize(400, 250)
+		self.table.setRowCount(25)
+		self.table.setColumnCount(4)
 
-# Put the widgets in a layout (now they start to appear):
-layout = QGridLayout(window)
-# layout.addWidget(nameLabel, 0, 0)
-# layout.addWidget(nameEdit, 0, 1)
-# layout.addWidget(addressLabel, 1, 0)
-# layout.addWidget(addressEdit, 1, 1)
-layout.addWidget(table, 2, 2)
-layout.addWidget(btn, 3, 2)
-layout.setRowStretch(2, 1)
+	def create_layout(self):
+		self.layout = qg.QGridLayout(self.window)
+		self.layout.addWidget(self.main_label, 1, 3)
+		self.layout.addWidget(self.table, 2, 2)
+		self.layout.addWidget(self.btn, 3, 2)
 
-# [Resizing the window]
+	def callback(self):
+		ob = pk.load(self.ob_fh)
+		for ask, i in zip(ob['asks'], range(len(ob['asks']))):
+			price_item = qg.QTableWidgetItem()
+			price_item.setBackgroundColor(qg.QColor('green'))
+			price_item.setText(str(ask['price']))
+			amount_item = qg.QTableWidgetItem()
+			amount_item.setBackgroundColor(qg.QColor('green'))
+			amount_item.setText(str(ask['amount']))
+			self.table.setItem(i,0, amount_item)
+			self.table.setItem(i,1, price_item)
+		for bid, i in zip(ob['bids'], range(len(ob['bids']))):
+			price_item = qg.QTableWidgetItem()
+			price_item.setBackgroundColor(qg.QColor('red'))
+			price_item.setText(str(bid['price']))
+			amount_item = qg.QTableWidgetItem()
+			amount_item.setBackgroundColor(qg.QColor('red'))
+			amount_item.setText(str(bid['amount']))
+			self.table.setItem(i,2, price_item)
+			self.table.setItem(i,3, amount_item)
 
-# Let's resize the window:
-window.resize(480, 160)
+def main():
+	mmg = MarketMakingGui()
 
-# The widgets are managed by the layout...
-window.resize(320, 180)
-
-# [Run the application]
-
-# Start the event loop...
-sys.exit(app.exec_())
+if __name__ == '__main__':
+	main()
+	
