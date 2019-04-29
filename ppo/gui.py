@@ -14,11 +14,13 @@ class MarketMakingGui(object):
 		self.create_labels()
 		self.init_table()
 		self.create_layout()
-		sys.exit(self.app.exec_())
+		self.app.exec_()
+		sys.exit()
 
 	def create_window(self):
 		self.window = qg.QWidget()
-		self.window.setWindowTitle("Hello World")
+		self.window.setWindowTitle("Market Making Simulation")
+		self.window.resizeEvent = self.windowResizeCallback
 		self.window.show()
 	
 	def create_button(self):
@@ -26,8 +28,6 @@ class MarketMakingGui(object):
 		self.btn.setObjectName("pb")
 		self.btn.clicked.connect(self.callback)
 		self.btn.setText("load book")
-		self.btn.resize(65,25)
-		self.btn.move(100,300)
 
 	def create_labels(self):
 		self.main_label = qg.QLabel("Market Making Visualisation")
@@ -36,19 +36,39 @@ class MarketMakingGui(object):
 		font.setBold(True)
 		font.setWeight(75)
 		self.main_label.setFont(font)
+		self.inv_label = qg.QLabel("Inventory:")
+		self.funds_label = qg.QLabel("Funds:")
+		self.worth_label = qg.QLabel("Worth:")
+
 
 	def init_table(self):
 		self.table = qg.QTableWidget()
-		self.table.setWindowTitle("QTableWidget Example @pythonspot.com")
-		self.table.resize(400, 250)
 		self.table.setRowCount(25)
 		self.table.setColumnCount(4)
+		self.table.setHorizontalHeaderLabels\
+		(['ask_amount', 'ask_price', 'bid_price', 'bit_amount'])
 
 	def create_layout(self):
-		self.layout = qg.QGridLayout(self.window)
-		self.layout.addWidget(self.main_label, 1, 3)
-		self.layout.addWidget(self.table, 2, 2)
-		self.layout.addWidget(self.btn, 3, 2)
+		self.layout = qg.QFormLayout(self.window)
+		self.layout.addWidget(self.main_label)
+		self.layout.addWidget(self.inv_label)
+		self.layout.addWidget(self.worth_label)
+		self.layout.addWidget(self.funds_label)
+		self.layout.addWidget(self.table)
+		self.layout.addWidget(self.btn)
+
+	def organize_widgets(self):
+		self.main_label.move(300, 10)
+		self.inv_label.move(10, 50)
+		self.worth_label.move(10, 70)
+		self.funds_label.move(10, 90)
+		self.table.move(200, 50)
+		self.table.resize(450, 800)
+		self.btn.move(10, 110)
+		self.btn.resize(100, 40)
+
+	def windowResizeCallback(self, obj):
+		self.organize_widgets()
 
 	def callback(self):
 		ob = pk.load(self.ob_fh)
