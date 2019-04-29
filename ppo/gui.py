@@ -6,7 +6,7 @@ import pickle as pk
 import PyQt4.QtGui as qg
 
 class MarketMakingGui(object):
-	def __init__(self, model):
+	def __init__(self):
 		self.ob_fh = open('/home/lavi/Downloads/ob.bin', 'rb')
 		self.app = qg.QApplication(sys.argv)
 		self.create_window()
@@ -14,6 +14,7 @@ class MarketMakingGui(object):
 		self.create_labels()
 		self.init_table()
 		self.create_layout()
+		self.window.show()
 		self.app.exec_()
 		sys.exit()
 
@@ -21,7 +22,6 @@ class MarketMakingGui(object):
 		self.window = qg.QWidget()
 		self.window.setWindowTitle("Market Making Simulation")
 		self.window.resizeEvent = self.windowResizeCallback
-		self.window.show()
 	
 	def create_button(self):
 		self.btn = qg.QPushButton(self.window)
