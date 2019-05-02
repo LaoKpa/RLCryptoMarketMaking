@@ -1,0 +1,4 @@
+[ORDER_BOOK_DATA_NORMALIZATION_CONFIG]
+order_book_file = /home/lavi/Documents/RLMM/data_sets/ob.bin
+normalized_order_book_file = /home/lavi/Documents/RLMM/data_sets/ob_normalized.bin
+predicted_td_avg = 5.0

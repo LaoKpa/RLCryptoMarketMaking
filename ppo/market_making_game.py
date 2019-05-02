@@ -1,10 +1,10 @@
 
-import pdb
+import imp
 import pickle as pk
 import numpy as np
-import config_helper as ch
 import gym
 
+CH = imp.load_source('config_helper', '../generic/config_helper.py')
 
 class StateSpace(object):
     def __init__(self, config, order_book_state_generator):
@@ -61,10 +61,6 @@ class OrderBookState(object):
             if i == 0:
                 a_tmp_2 = 1.0
             else:
-                # if book[i-1]['price'] == 0:
-                #     import pdb; pdb.set_trace()
-                # if book[i-1]['amount'] == 0:
-                #     import pdb; pdb.set_trace()
                 a_tmp_2 = (book[i]['price'] * book[i]['amount']) / (book[i-1]['price'] * book[i-1]['amount'])
             ret.append([p_tmp_1-1.0, p_tmp_2-1.0, a_tmp_1-1.0, a_tmp_2-1.0, float(book[i]['my_order'])])
         return np.array(ret)
@@ -79,7 +75,7 @@ class OrderBookState(object):
 class OrderBook(object):
     def __init__(self, config_file_path, config_name):
         self.trade_count = 0
-        self.config = ch.ConfigHelper(config_file_path, config_name)
+        self.config = CH.ConfigHelper(config_file_path, config_name)
         self.order_book_transformer = OrderBookTransformator()
         self.order_book_file_handler = open(self.config.order_book_file, 'rb')
         self.trades_file_handler = open(self.config.trades_file, 'rb')
@@ -110,7 +106,7 @@ class OrderBook(object):
         done = False
         reward = 0
         result_list = []
-        if self.next_order_book['asks'][0]['timestamp'] == self.timestamp:
+        while self.next_order_book['asks'][0]['timestamp'] == self.timestamp:
             self.current_order_book = self.next_order_book
             self.next_order_book = pk.load(self.order_book_file_handler)
             self.order_book_transformer.transform_order_book(self.current_order_book)
@@ -121,6 +117,7 @@ class OrderBook(object):
                 result_list.append(res)
                 self.trade_count += 1
         self.state_space.update_state(result_list, self.current_order_book)
+
         if self.timestamp > self.trades[self.trade_count]['timestamp']:
             raise Exception()
         self.timestamp += 1
@@ -206,7 +203,7 @@ class OrderBookTransformator(object):
 
 class ActionSpace(object):
     def __init__(self, config_file_path, config_name):
-        self.config = ch.ConfigHelper(config_file_path, config_name)
+        self.config = CH.ConfigHelper(config_file_path, config_name)
 
     def network_action_to_alteration(self, action, dim, book, available_funds):
         calc_price = lambda x: 1 + (x - 0.5) * 2 / float(10)
@@ -299,7 +296,7 @@ class GameWrapper(object):
 
 class SerialGameEnvironment(object):
     def __init__(self, config_file_path, config_name):
-        self.config = ch.ConfigHelper(config_file_path, config_name)
+        self.config = CH.ConfigHelper(config_file_path, config_name)
         self.envs = [GameWrapper(MarketMakingGame(config_file_path,config_name),
             self.config.num_of_frames) for _ in range(self.config.num_of_envs)]
         self.initial_state = [env.current_state for env in self.envs]        
@@ -343,27 +340,3 @@ class SerialGameEnvironment(object):
             dones_env_batch.append(done)
         return ((np.array(ask_book_env_batch), np.array(bid_book_env_batch),
             np.array(inv_env_batch), np.array(funds_env_batch)), np.array(rewards_env_batch), np.array(dones_env_batch))
-
-if __name__ == '__main__':
-        mm = SerialGameEnvironment('../configs/btc_market_making_config.txt', 'MARKET_MAKING_CONFIG')
-        action = np.zeros(625)
-        action[300] = 1
-        r = mm.step([action]*5)
-        import pdb; pdb.set_trace()
-        # pdb.set_trace()
-        # ob.order_book_transformer.add_order(4000.5, 1.1, 'sell')
-        # print(ob.current_order_book)
-        # ob.order_book_transformer.transform_order_book(ob.current_order_book)
-        # t = {'amount': '0.5', 'timestamp': 1550567910, 'tid': 338912171, 'exchange': 'bitfinex', 'price': '3999.8', 'type': 'sell'}
-        # res = ob.settle_trade(t, ob.current_order_book)
-        # print(res)
-
-# game.init()
-# game.new_episode()
-# state = game.get_state()
-# reward = game.make_action(action)
-# game.get_total_reward()
-# done = game.is_episode_finished()
-# score = game.get_total_reward()
-# game.get_available_buttons_size()
-# game.close()

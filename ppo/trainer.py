@@ -116,13 +116,14 @@ def learn(policy, env, config):
             logger.record_tabular("explained_variance", float(ev))
             logger.record_tabular("time elapsed", float(tnow - tfirststart))
             
-            savepath = "./models/" + str(update) + "/model.ckpt"
+            savepath = config.save_model_path + str(update) + "/model.ckpt"
             model.save(savepath)
             print('Saving to', savepath)
 
             # Test our agent with 3 trials and mean the score
             # This will be useful to see if our agent is improving
             test_score = testing(model)
+
             logger.record_tabular("Mean score test level", test_score)
 
             logger.dump_tabular()
