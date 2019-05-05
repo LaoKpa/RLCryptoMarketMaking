@@ -8,7 +8,7 @@ import market_making_game as env
 import PyQt4.QtGui as qg
 
 import config_helper as ch
-
+import utils as ul
 import time
 
 import numpy as np
@@ -35,14 +35,15 @@ CH = imp.load_source('config_helper', '../generic/config_helper.py')
 class MarketMakingGui(object):
 	def __init__(self, config):
 		self.model = ml.Model(policy.MarketMakingPolicy, config)
-		load_path = "/home/lavi/Documents/RLMM/models/190/model.ckpt"
+		load_path = ul.get_current_saved_model_path(config.save_model_path)
 		self.model.load(load_path)
 		self.ob_fh = open('/home/lavi/Downloads/ob.bin', 'rb')
 		self.app = qg.QApplication(sys.argv)
 		self.create_window()
 		self.create_button()
 		self.create_labels()
-		self.init_table()
+		self.create_simu_table()
+		self.create_display_table()
 		self.create_layout()
 		self.window.show()
 		self.app.exec_()
@@ -66,34 +67,34 @@ class MarketMakingGui(object):
 		font.setBold(True)
 		font.setWeight(75)
 		self.main_label.setFont(font)
-		self.inv_label = qg.QLabel("Inventory:")
-		self.funds_label = qg.QLabel("Funds:")
-		self.worth_label = qg.QLabel("Worth:")
 
-
-	def init_table(self):
+	def create_simu_table(self):
 		self.table = qg.QTableWidget()
 		self.table.setRowCount(25)
 		self.table.setColumnCount(4)
 		self.table.setHorizontalHeaderLabels\
 		(['ask_amount', 'ask_price', 'bid_price', 'bit_amount'])
 
+	def create_display_table(self):
+		self.display_table = qg.QTableWidget()
+		self.display_table.setRowCount(1)
+		self.display_table.setColumnCount(4)
+		self.display_table.setHorizontalHeaderLabels\
+		(['inventory', 'funds', 'net_worth', 'price'])
+
 	def create_layout(self):
 		self.layout = qg.QFormLayout(self.window)
 		self.layout.addWidget(self.main_label)
-		self.layout.addWidget(self.inv_label)
-		self.layout.addWidget(self.worth_label)
-		self.layout.addWidget(self.funds_label)
 		self.layout.addWidget(self.table)
+		self.layout.addWidget(self.display_table)
 		self.layout.addWidget(self.btn)
 
 	def organize_widgets(self):
 		self.main_label.move(300, 10)
-		self.inv_label.move(10, 50)
-		self.worth_label.move(10, 70)
-		self.funds_label.move(10, 90)
-		self.table.move(200, 50)
+		self.table.move(200, 125)
 		self.table.resize(450, 800)
+		self.display_table.move(200, 50)
+		self.display_table.resize(450, 55)
 		self.btn.move(10, 110)
 		self.btn.resize(100, 40)
 
@@ -127,6 +128,28 @@ class MarketMakingGui(object):
 			amount_item.setText(str(bid['amount']))
 			self.table.setItem(i,2, price_item)
 			self.table.setItem(i,3, amount_item)
+	
+	def print_stats(self, inv, price, funds, net_worth):
+		inv_item = qg.QTableWidgetItem()
+		# inv_item.setBackgroundColor(qg.QColor(color))
+		inv_item.setText(str(inv))
+
+		price_item = qg.QTableWidgetItem()
+		# price_item.setBackgroundColor(qg.QColor(color))
+		price_item.setText(str(price))
+
+		funds_item = qg.QTableWidgetItem()
+		# price_item.setBackgroundColor(qg.QColor(color))
+		funds_item.setText(str(funds))
+
+		net_worth_item = qg.QTableWidgetItem()
+		# price_item.setBackgroundColor(qg.QColor(color))
+		net_worth_item.setText(str(net_worth))
+
+		self.display_table.setItem(0,0, inv_item)
+		self.display_table.setItem(0,1, funds_item)
+		self.display_table.setItem(0,2, net_worth_item)
+		self.display_table.setItem(0,3, price_item)
 
 	def callback(self):
 		test_env = env.SerialGameEnvironment\
@@ -142,12 +165,6 @@ class MarketMakingGui(object):
 			funds = 0
 			i=0
 			while done == False and i<86400:
-				self.inv_label.setText('Inventory: {0}'.format(inv))
-				self.organize_widgets()
-				self.funds_label.setText('Funds: {0}'.format(funds))
-				self.organize_widgets()
-				self.worth_label.setText('Worth: {0}'.format(net_worth))
-				self.organize_widgets()
 				self.print_order_book(test_env.envs[0].game.order_book.current_order_book)
 				action, _, _ = self.model.step(*obs)
 				obs, reward, done = test_env.step(action)
@@ -157,7 +174,8 @@ class MarketMakingGui(object):
 				price = test_env.envs[0].game.order_book.state_space.current_price
 				funds = test_env.envs[0].game.order_book.state_space.available_funds
 				net_worth = funds + inv * price
-				#print (net_worth)
+				self.print_stats(inv, price, funds, net_worth)
+				# print (net_worth)
 				#time.sleep(0.1)
 				qg.qApp.processEvents()
 			total_score += score

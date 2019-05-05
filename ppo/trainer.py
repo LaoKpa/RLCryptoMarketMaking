@@ -116,7 +116,7 @@ def learn(policy, env, config):
             logger.record_tabular("explained_variance", float(ev))
             logger.record_tabular("time elapsed", float(tnow - tfirststart))
             
-            savepath = config.save_model_path + str(update) + "/model.ckpt"
+            savepath = config.save_model_path + '/' + str(update) + '/model.ckpt'
             model.save(savepath)
             print('Saving to', savepath)
 
@@ -160,8 +160,7 @@ def testing(model):
             inv = test_env.envs[0].game.order_book.state_space.inventory
             price = test_env.envs[0].game.order_book.state_space.current_price
             funds = test_env.envs[0].game.order_book.state_space.available_funds
-
-            net_worth = funds + inv*price
+            net_worth = funds + inv * price
             print (net_worth)
 
         total_score += score

@@ -1,5 +1,5 @@
 [MARKET_MAKING_CONFIG]
-order_book_file = /home/lavi/Desktop/RLCryptoMarketMaking2/ob.bin
+order_book_file = /home/lavi/Documents/RLMM/data_sets/ob_normalized.bin
 trades_file = /home/lavi/Desktop/RLCryptoMarketMaking2/tr.bin
 
 max_funds = 10000.0

@@ -26,13 +26,13 @@ from baselines import logger
 import gym
 import math
 import os
-
+import utils as ul
 import trainer
 
 class MarketMakingCLITester(object):
 	def __init__(self, config):
 		self.model = ml.Model(policy.MarketMakingPolicy, config)
-		load_path = "/home/lavi/Documents/RLMM/models/190/model.ckpt"
+		load_path = ul.get_current_saved_model_path(config.save_model_path)
 		self.model.load(load_path)
 		self.test_model()
 
@@ -55,7 +55,7 @@ class MarketMakingCLITester(object):
 				price = test_env.envs[0].game.order_book.state_space.current_price
 				funds = test_env.envs[0].game.order_book.state_space.available_funds
 				net_worth = funds + inv * price
-				#print (net_worth)
+				print('nw: {0} | inv: {1}| price: {2}| funds: {3}| count: {4}'.format(net_worth, inv, price, funds, i))
 			total_score += score
 			trial += 1
 		total_test_score = total_score / 1.0

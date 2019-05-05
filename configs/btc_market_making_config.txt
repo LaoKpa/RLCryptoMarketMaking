@@ -23,8 +23,10 @@ ent_coef=0.01
 lr = lambda _: 2e-4
 cliprange = lambda _: 0.1
 max_grad_norm = 0.5
-log_interval = 10
+log_interval = 1
 
 action_vector_size = 625
 num_of_order_book_entries = 25
 order_book_entrie_rep_dim = 5
+
+save_model_path = /home/lavi/Documents/RLMM/models

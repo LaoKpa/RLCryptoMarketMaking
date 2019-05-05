@@ -1,5 +1,6 @@
 
 import imp
+import time as tm
 import pickle as pk
 import numpy as np
 import gym
@@ -26,13 +27,23 @@ class StateSpace(object):
         if settled_transaction['type'] == 'buy':
             self.inventory += settled_transaction['amount']
             self.available_funds -= settled_transaction['amount'] * settled_transaction['price']
+            print('-{0}'.format(settled_transaction['amount'] * settled_transaction['price']))
+            if settled_transaction['amount'] * settled_transaction['price'] > 1000:
+                import pdb; pdb.set_trace()
             self.current_price = settled_transaction['price']
         elif settled_transaction['type'] == 'sell':
             self.inventory -= settled_transaction['amount']
             self.available_funds += settled_transaction['amount'] * settled_transaction['price']
+            print('{0}'.format(settled_transaction['amount'] * settled_transaction['price']))
+            if settled_transaction['amount'] * settled_transaction['price'] > 1000:
+                import pdb; pdb.set_trace()
             self.current_price = settled_transaction['price']
         else:
             raise Exception('Unknown transaction type.')
+
+    def get_net_worth(self):
+        net_worth = self.available_funds + self.inventory * self.current_price
+        return net_worth
 
     def get_state(self):
         done = (self.available_funds <=0) and (self.inventory * self.current_price) <= 0 # change to minimum order limit
@@ -74,6 +85,7 @@ class OrderBookState(object):
 
 class OrderBook(object):
     def __init__(self, config_file_path, config_name):
+        self.count = 0
         self.trade_count = 0
         self.config = CH.ConfigHelper(config_file_path, config_name)
         self.order_book_transformer = OrderBookTransformator()
@@ -92,7 +104,13 @@ class OrderBook(object):
         self.order_book_transformer.transform_order_book(self.current_order_book)
 
     def get_currnet_price(self):
-        return (self.current_order_book['asks'][0]['price'] + self.current_order_book['bids'][0]['price']) / 2.0
+        for ask in self.current_order_book['asks']:
+            if not ask['my_order']:
+                current_ask_price = ask['price']
+        for bid in self.current_order_book['bids']:
+            if not bid['my_order']:
+                current_bid_price = bid['price']
+        return (current_ask_price + current_bid_price) / 2.0
 
     def sync_trade_clock(self):
         while self.trades[self.trade_count]['timestamp'] <= self.timestamp:
@@ -106,21 +124,23 @@ class OrderBook(object):
         done = False
         reward = 0
         result_list = []
-        while self.next_order_book['asks'][0]['timestamp'] == self.timestamp:
+        if self.next_order_book['asks'][0]['timestamp'] == self.timestamp:
             self.current_order_book = self.next_order_book
             self.next_order_book = pk.load(self.order_book_file_handler)
+            self.count+=1
             self.order_book_transformer.transform_order_book(self.current_order_book)
         if self.trades[self.trade_count]['timestamp'] == self.timestamp:
-            count = 0
+            print('Trade Happened')
             while len(self.trades) > self.trade_count and self.trades[self.trade_count]['timestamp'] == self.timestamp:
                 res = self.settle_trade(self.trades[self.trade_count], self.current_order_book)
                 result_list.append(res)
                 self.trade_count += 1
         self.state_space.update_state(result_list, self.current_order_book)
-
         if self.timestamp > self.trades[self.trade_count]['timestamp']:
             raise Exception()
         self.timestamp += 1
+        if self.state_space.get_net_worth() <= 0:
+            done = True
         return done
 
     def settle_trade(self, trade, order_book):
@@ -129,7 +149,7 @@ class OrderBook(object):
         total_amount = 0
         transaction_amount = 0
         transaction_price = 0
-        trade_dict = {'buy':'asks', 'sell':'bids'}
+        trade_dict = {'sell':'asks', 'buy':'bids'}
         direction = trade_dict[trade['type']]
         try:
             while not order_book[direction][count]['my_order']:
@@ -137,8 +157,15 @@ class OrderBook(object):
                 count+=1
         except Exception as e:
             return {'amount':0, 'price':0, 'type':0}
+    
         my_trade_amount = float(trade['amount']) - total_amount
+        
+        if my_trade_amount > 100:
+            import pdb; pdb.set_trace()
+        
         my_order_amount = order_book[direction][count]['amount']
+
+
         if my_trade_amount > 0:
             if my_order_amount - my_trade_amount <= 0:
                 transaction_amount = my_trade_amount
@@ -147,8 +174,9 @@ class OrderBook(object):
             else:
                 transaction_amount = my_trade_amount
                 transaction_price = order_book[direction][count]['price']
-                self.order_book_transformer.delete_order(order_book[direction][count]['index'])
-                self.order_book_transformer.add_order(order_book[direction][count]['price'], my_order_amount - my_trade_amount, trade['type'])
+                self.order_book_transformer.change_order(order_book[direction][count]['price'],\
+                    my_order_amount - my_trade_amount, order_book[direction][count]['index'])
+
         return {'amount':transaction_amount, 'price':transaction_price, 'type':trade['type']}
 
 class OrderBookTransformator(object):
@@ -160,7 +188,7 @@ class OrderBookTransformator(object):
         asks_book = order_book['asks']
         bids_book = order_book['bids']
         timestamp = order_book['asks'][0]['timestamp']
-        if alteration['direction'] == 'buy':
+        if alteration['direction'] == 'sell':
             direction='asks'
             alteration_price = alteration['price']
             ask_prices = [ask['price'] for ask in asks_book]
@@ -191,8 +219,16 @@ class OrderBookTransformator(object):
     def add_order(self, price, amount, direction):
         self.index += 1
         self.alterations_list.append({'price':price, 'amount':amount, 'direction':direction, 'index':self.index})
-        return self.index
+        return self.index    
 
+    def change_order(self, price, amount, index):
+        for alt in self.alterations_list:
+            if alt['index'] == index:
+                self.alterations_list.remove(alt)
+                alt['amount'] = amount
+                alt['price'] = price
+                self.alterations_list.append(alt)
+    
     def delete_order(self, index):
         for alt in self.alterations_list:
             if alt['index'] == index:
@@ -219,13 +255,13 @@ class ActionSpace(object):
 
         suggested_ask_amount = (available_funds / current_ask_price) * calc_amount(ask_amount_arg / float(self.config.order_amount_scale_size))
         suggested_bid_amount = (available_funds / current_bid_price) * calc_amount(bid_amount_arg / float(self.config.order_amount_scale_size))
-
+        print('{0} | {1} | {2} | {3}'.format(suggested_ask_amount, suggested_ask_price, suggested_bid_price, suggested_bid_amount))
         if suggested_ask_amount == 0:
             import pdb; pdb.set_trace()
         if suggested_bid_amount == 0:
             import pdb; pdb.set_trace()
 
-        return [(suggested_ask_price, suggested_ask_amount, 'buy'), (suggested_bid_price, suggested_bid_amount, 'sell')]
+        return [(suggested_ask_price, suggested_ask_amount, 'sell'), (suggested_bid_price, suggested_bid_amount, 'buy')]
 
 class Rewarder(object):
     def __init__(self):
@@ -249,7 +285,7 @@ class MarketMakingGame(object):
         self.action_space = ActionSpace(config_file_path, config_name)
         self.rewarder = Rewarder()
         self.order_index = None
-    
+        self.count = 0
     def get_state(self):
         return self.order_book.get_state()
 
@@ -257,8 +293,12 @@ class MarketMakingGame(object):
         ask_order, bid_order = self.action_space.network_action_to_alteration(action_vector, 5,
         self.order_book.current_order_book, self.order_book.state_space.available_funds)
         if self.order_index != None:
+            self.count = 1
             self.order_book.order_book_transformer.delete_order(self.order_index['ask'])
             self.order_book.order_book_transformer.delete_order(self.order_index['bid'])
+        else:
+            if self.count > 0:
+                import pdb; pdb.set_trace()
         ask_order_index = self.order_book.order_book_transformer.add_order(ask_order[0], ask_order[1], ask_order[2])
         bid_order_index = self.order_book.order_book_transformer.add_order(bid_order[0], bid_order[1], bid_order[2])
         self.order_index = {'ask':ask_order_index, 'bid':bid_order_index}
@@ -287,7 +327,7 @@ class GameWrapper(object):
         self.game = game
         self.nframes = nframes
         self.current_state = [self.game.make_empty_action()['state'] for i in range(self.nframes)]
-    
+
     def make_action(self, action):
         res = self.game.make_action(action)
         self.current_state.append(res['state'])
