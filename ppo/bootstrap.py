@@ -13,18 +13,14 @@ import config_helper as ch
 
 def main():
     config = tf.ConfigProto()
-
     # Avoid warning message errors
     os.environ["CUDA_VISIBLE_DEVICES"]="0"
-
     # Allowing GPU memory growth
     config.gpu_options.allow_growth = True
-
     bootstrap_config = ch.ConfigHelper('../configs/btc_market_making_config.txt', 'MARKET_MAKING_CONFIG')
-
     with tf.Session(config=config):
         trainer.learn(policy.MarketMakingPolicy,
-        env.SerialGameEnvironment('../configs/btc_market_making_config.txt', 'MARKET_MAKING_CONFIG'), bootstrap_config)
+        env.ParallelGameEnvironment('../configs/btc_market_making_config.txt', 'MARKET_MAKING_CONFIG'), bootstrap_config)
 
 if __name__ == '__main__':
     main()

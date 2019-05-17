@@ -1,0 +1,6 @@
+
+Market Making Game:
+    1. Check that all prices are from the original orderbook and not affected by 'my_order's.
+    2. Check that negatie available funds are not affecting any other calculation, if yes, change to net worth.
+    3. When calculating reward, need to save the price with which we bougth the coins.
+    4. Make sure that ask/bid prices are taken from the top and not the bootom of the order book.

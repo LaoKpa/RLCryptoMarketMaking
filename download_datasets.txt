@@ -1,0 +1,15 @@
+
+scp -i "lavisbot.pem" ubuntu@ec2-34-218-251-150.us-west-2.compute.amazonaws.com:/home/ubuntu/CryptoArbitrage/crypto_data_gathering/ob_xrp.bin /home/lavi/Desktop/ob_xrp.bin
+scp -i "lavisbot.pem" ubuntu@ec2-34-218-251-150.us-west-2.compute.amazonaws.com:/home/ubuntu/CryptoArbitrage/crypto_data_gathering/tr_xrp.bin /home/lavi/Desktop/tr_xrp.bin
+
+scp -i "lavisbot.pem" ubuntu@ec2-54-189-142-112.us-west-2.compute.amazonaws.com:/home/ubuntu/CryptoArbitrage/crypto_data_gathering/tr_eos.bin /home/lavi/Desktop/tr_eos.bin
+scp -i "lavisbot.pem" ubuntu@ec2-54-189-142-112.us-west-2.compute.amazonaws.com:/home/ubuntu/CryptoArbitrage/crypto_data_gathering/ob_eos.bin /home/lavi/Desktop/ob_eos.bin
+
+scp -i "lavisbot.pem" ubuntu@ec2-52-11-159-40.us-west-2.compute.amazonaws.com:/home/ubuntu/CryptoArbitrage/crypto_data_gathering/tr_ygg.bin /home/lavi/Desktop/tr_ygg.bin
+scp -i "lavisbot.pem" ubuntu@ec2-52-11-159-40.us-west-2.compute.amazonaws.com:/home/ubuntu/CryptoArbitrage/crypto_data_gathering/ob_ygg.bin /home/lavi/Desktop/ob_ygg.bin
+
+scp -i "lavisbot.pem" ubuntu@ec2-54-201-2-52.us-west-2.compute.amazonaws.com:/home/ubuntu/CryptoArbitrage/crypto_data_gathering/tr_zec.bin /home/lavi/Desktop/tr_zec.bin
+scp -i "lavisbot.pem" ubuntu@ec2-54-201-2-52.us-west-2.compute.amazonaws.com:/home/ubuntu/CryptoArbitrage/crypto_data_gathering/ob_zec.bin /home/lavi/Desktop/ob_zec.bin
+
+scp -i "lavisbot.pem" ubuntu@ec2-54-202-63-254.us-west-2.compute.amazonaws.com:/home/ubuntu/CryptoArbitrage/crypto_data_gathering/tr_eth.bin /home/lavi/Desktop/tr.bin
+scp -i "lavisbot.pem" ubuntu@ec2-54-202-63-254.us-west-2.compute.amazonaws.com:/home/ubuntu/CryptoArbitrage/crypto_data_gathering/ob_eth.bin /home/lavi/Desktop/ob.bin

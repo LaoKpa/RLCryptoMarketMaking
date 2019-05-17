@@ -4,14 +4,12 @@ import time
 
 import pickle as pk
 
-
-
 import imp
 import tensorflow as tf
 
 CH = imp.load_source('config_helper', '../generic/config_helper.py')
 
-ORDER_BOOK_LAG_RANGE = 50
+ORDER_BOOK_LAG_RANGE = 1000
 
 def get_unified_trades(trades_file, output_file):
     time_stamp = 0
@@ -120,6 +118,7 @@ def main():
         print('Number of samples: {0}.'.format(num_of_samples))
     else:
         print('FAILD TO NORMALIZE ORDER BOOK DATASET GENERATED!')
+        print('Stats: avg td = {0} | min td = {1}'.format(avg_td, min_td))
 
 if __name__ == '__main__':
     main()

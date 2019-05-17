@@ -33,7 +33,7 @@ class Runner(object):
         mb_ask_book_env, mb_bid_book_env, mb_inv_env, mb_funds_env = [],[],[],[]
 
         # For n in range number of steps
-        for _ in range(self.nsteps):
+        for i in range(self.nsteps):
             # Given observations, get action value and neglopacs
             # We already have self.obs because Runner superclass run self.obs[:] = env.reset() on init
             actions, values, neglogpacs = self.model.step(*self.obs)
@@ -47,7 +47,9 @@ class Runner(object):
             mb_dones.append(self.dones)
             # Take actions in env and look the results
             # Infos contains a ton of useful informations
-            self.obs, rewards, self.dones = self.env.step(actions)
+            self.obs, rewards, self.dones, time_elapsed = self.env.step(actions)
+            if i % 10 == 0:
+                print('Runner Progress Count: {0}/{1} | Time: {2}'.format(i, self.nsteps, time_elapsed), end='\r', flush=True)
             mb_rewards.append(rewards)
         #batch of steps to batch of rollouts
         # mb_obs = np.asarray(mb_obs, dtype=np.float32)

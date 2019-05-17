@@ -23,4 +23,8 @@ def discount_with_dones(rewards, dones, gamma):
 	return discounted[::-1]
 
 def get_current_saved_model_path(path):
-	return os.path.join(path, max(os.listdir(path)), 'model.ckpt')
+	try:
+		load_path = os.path.join(path, max(os.listdir(path)), 'model.ckpt')
+	except Exception as e:
+		load_path = ''
+	return load_path

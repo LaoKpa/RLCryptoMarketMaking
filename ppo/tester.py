@@ -37,21 +37,25 @@ class MarketMakingCLITester(object):
 		self.test_model()
 
 	def test_model(self):
-		test_env = env.SerialGameEnvironment\
+		test_env = env.ParallelGameEnvironment\
 			('../configs/btc_market_making_test_config.txt', 'MARKET_MAKING_CONFIG')
 		total_score = 0
 		trial = 0
+		tmp_inv = 0
 		for trial in range(1):
 			obs = test_env.get_initial_state()
 			done = False
 			score = 0
 			i=0
-			while done == False and i<86400:
+			while done == False:
 				action, _, _ = self.model.step(*obs)
-				obs, reward, done = test_env.step(action)
+				obs, reward, done, t = test_env.step(action)
 				i=i+1
 				score += reward[0]
 				inv = test_env.envs[0].game.order_book.state_space.inventory
+				if abs(inv-tmp_inv) > 100:
+					import pdb; pdb.set_trace()
+				tmp_inv = inv
 				price = test_env.envs[0].game.order_book.state_space.current_price
 				funds = test_env.envs[0].game.order_book.state_space.available_funds
 				net_worth = funds + inv * price
@@ -74,4 +78,3 @@ def main():
 
 if __name__ == '__main__':
 	main()
-	

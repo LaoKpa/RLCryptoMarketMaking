@@ -102,30 +102,30 @@ class MarketMakingGui(object):
 		self.organize_widgets()
 
 	def print_order_book(self, ob):
-		for ask, i in zip(ob['asks'], range(len(ob['asks']))):
-			if ask['my_order']:
+		for ask, i in zip(ob[env.ASKS_INDEX], range(len(ob[env.ASKS_INDEX]))):
+			if ask[env.MY_ORDER_INDEX]:
 				color='yellow'
 			else:
 				color='green'
 			price_item = qg.QTableWidgetItem()
 			price_item.setBackgroundColor(qg.QColor(color))
-			price_item.setText(str(ask['price']))
+			price_item.setText(str(ask[env.PRICE_INDEX]))
 			amount_item = qg.QTableWidgetItem()
 			amount_item.setBackgroundColor(qg.QColor(color))
-			amount_item.setText(str(ask['amount']))
+			amount_item.setText(str(ask[env.AMOUNT_INDEX]))
 			self.table.setItem(i,0, amount_item)
 			self.table.setItem(i,1, price_item)
-		for bid, i in zip(ob['bids'], range(len(ob['bids']))):
-			if bid['my_order']:
+		for bid, i in zip(ob[env.BIDS_INDEX], range(len(ob[env.BIDS_INDEX]))):
+			if bid[env.MY_ORDER_INDEX]:
 				color='yellow'
 			else:
 				color='red'
 			price_item = qg.QTableWidgetItem()
 			price_item.setBackgroundColor(qg.QColor(color))
-			price_item.setText(str(bid['price']))
+			price_item.setText(str(bid[env.PRICE_INDEX]))
 			amount_item = qg.QTableWidgetItem()
 			amount_item.setBackgroundColor(qg.QColor(color))
-			amount_item.setText(str(bid['amount']))
+			amount_item.setText(str(bid[env.AMOUNT_INDEX]))
 			self.table.setItem(i,2, price_item)
 			self.table.setItem(i,3, amount_item)
 	
@@ -152,7 +152,7 @@ class MarketMakingGui(object):
 		self.display_table.setItem(0,3, price_item)
 
 	def callback(self):
-		test_env = env.SerialGameEnvironment\
+		test_env = env.ParallelGameEnvironment\
 			('../configs/btc_market_making_test_config.txt', 'MARKET_MAKING_CONFIG')
 		total_score = 0
 		trial = 0
@@ -167,7 +167,7 @@ class MarketMakingGui(object):
 			while done == False and i<86400:
 				self.print_order_book(test_env.envs[0].game.order_book.current_order_book)
 				action, _, _ = self.model.step(*obs)
-				obs, reward, done = test_env.step(action)
+				obs, reward, done, t = test_env.step(action)
 				i=i+1
 				score += reward[0]
 				inv = test_env.envs[0].game.order_book.state_space.inventory
