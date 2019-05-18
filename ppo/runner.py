@@ -1,6 +1,5 @@
 
 import numpy as np
-from baselines.common.runners import AbstractEnvRunner
 
 class Runner(object):
     """
@@ -16,15 +15,10 @@ class Runner(object):
         self.lam = config.lam
         # Discount rate
         self.gamma = config.gamma
-
         self.env = env
-
         self.model = model
-
         self.nsteps = config.nsteps
-
         self.obs = env.get_initial_state()
-
         self.dones = [False for _ in range(config.num_of_envs)]
 
     def run(self):
