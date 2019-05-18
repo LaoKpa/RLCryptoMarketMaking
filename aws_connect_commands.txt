@@ -1,0 +1,6 @@
+sudo ssh -i "lavisbot.pem" ubuntu@ec2-34-215-73-248.us-west-2.compute.amazonaws.com
+sudo ssh -i "lavisbot.pem" ubuntu@ec2-34-218-251-150.us-west-2.compute.amazonaws.com
+sudo ssh -i "lavisbot.pem" ubuntu@ec2-54-189-142-112.us-west-2.compute.amazonaws.com
+sudo ssh -i "lavisbot.pem" ubuntu@ec2-52-11-159-40.us-west-2.compute.amazonaws.com
+sudo ssh -i "lavisbot.pem" ubuntu@ec2-54-201-2-52.us-west-2.compute.amazonaws.com
+sudo ssh -i "lavisbot.pem" ubuntu@ec2-54-202-63-254.us-west-2.compute.amazonaws.com

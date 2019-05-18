@@ -64,7 +64,6 @@ class Model(object):
         # Value loss 0.5 * SUM [max(unclipped, clipped)
         vf_loss = 0.5 * tf.reduce_mean(tf.maximum(value_loss_unclipped,value_loss_clipped ))
 
-
         # Clip the policy
         # Output -log(pi) (new -log(pi))
         neglogpac = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=train_model.pi, labels=actions_)
