@@ -101,6 +101,8 @@ class Model(object):
         # 1. Get the model parameters
         params = ut.find_trainable_variables("model")
 
+
+
         # 2. Calculate the gradients
         grads = tf.gradients(loss, params)
         if config.max_grad_norm is not None:
