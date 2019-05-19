@@ -47,52 +47,102 @@ class DataConveyer(object):
         self.sample_index += 1
         return sample.copy()
 
+class OneHot(object):
+    def __init__(self, vector_size):
+        self.one_hot_vector = np.zeros(vector_size)
+        self.one_index = None
+    
+    def set_new_one(self, new_one_index):
+        if self.one_index is not None:
+            self.one_hot_vector[self.one_index] = 0
+            self.one_hot_vector[new_one_index] = 1
+        else:
+            self.one_hot_vector[new_one_index] = 1
+        self.one_index = new_one_index
+        return self.one_hot_vector
+
+    def get_one_hot(self):
+        return self.one_hot_vector
+
 class StateSpace(object):
     def __init__(self, config, order_book_state_generator):
         self.inventory = 0
         self.current_price = 0
         self.config = config
         self.available_funds = self.config.initial_investment
+        self.initial_investment = self.config.initial_investment
         self.order_book_state_generator = order_book_state_generator
         self.order_book_state = None
-        self.inventory_vector = np.zeros(self.config.inventory_vector_size)
-        self.funds_vector = np.zeros(self.config.funds_vector_size)
-        self.inventory_ones_num = 0
-        self.funds_ones_num = 0
+        self.pos_funds_one_hot = OneHot(self.config.representation_vector_size)
+        self.neg_funds_one_hot = OneHot(self.config.representation_vector_size)
+        self.spread_one_hot = OneHot(self.config.representation_vector_size)
+        self.ask_price_one_hot = OneHot(self.config.representation_vector_size)
+        self.bid_price_one_hot = OneHot(self.config.representation_vector_size)
+        self.pos_inventory_one_hot = OneHot(self.config.representation_vector_size)
+        self.neg_inventory_one_hot = OneHot(self.config.representation_vector_size)
+        self.bought_inventory_avg_price_one_hot = OneHot(self.config.representation_vector_size)
+        self.position_in_ask_book_one_hot = OneHot(self.config.representation_vector_size)
+        self.position_in_bid_book_one_hot = OneHot(self.config.representation_vector_size)
+        self.price_diff_in_ask_book_one_hot = OneHot(self.config.representation_vector_size)
+        self.price_diff_in_bid_book_one_hot = OneHot(self.config.representation_vector_size)
+        self.wealth_accumulation_one_hot = OneHot(self.config.representation_vector_size)
 
-    def update_state(self, list_of_transactions, book):
-        for transaction in list_of_transactions:
-            self.analyze_single_trnsaction(transaction)
-        self.order_book_state = self.order_book_state_generator.get_order_book_state(book)
-
-    def analyze_single_trnsaction(self, settled_transaction):
-        if settled_transaction[AMOUNT_INDEX] > 100:
-            import pdb; pdb.set_trace()
-            print('duck')
-        if settled_transaction[AMOUNT_INDEX] == 0:
-            return 0
-        if settled_transaction[TRADE_TYPE_INDEX] == TRADE_BUY_INDEX:
-            self.inventory += settled_transaction[AMOUNT_INDEX]
-            self.available_funds -= settled_transaction[AMOUNT_INDEX] * settled_transaction[PRICE_INDEX]
-        elif settled_transaction[TRADE_TYPE_INDEX] == TRADE_SELL_INDEX:
-            self.inventory -= settled_transaction[AMOUNT_INDEX]
-            self.available_funds += settled_transaction[AMOUNT_INDEX] * settled_transaction[PRICE_INDEX]
-        else:
-            raise Exception('Unknown transaction type.')
-
-    def get_state(self):
-        done = (self.available_funds <=0) and (self.inventory * self.current_price) <= 0 # change to minimum order limit
-        max_inventory = self.available_funds / float(self.current_price) + self.inventory
-        inventory_ones_num = (self.inventory / max_inventory) * self.config.inventory_vector_size
+    def get_pos_funds_representation(self):
         funds_ones_num = (self.available_funds / float(self.config.max_funds)) * self.config.funds_vector_size
-        inventory_ones_num = max(min(int(inventory_ones_num), self.config.inventory_vector_size - 1), 0)
         funds_ones_num = max(min(int(funds_ones_num), self.config.funds_vector_size - 1), 0)
-        self.inventory_vector[inventory_ones_num] = 1
-        self.funds_vector[funds_ones_num] = 1
-        self.inventory_vector[self.inventory_ones_num] = 0
-        self.funds_vector[self.funds_ones_num] = 0
-        self.inventory_ones_num = inventory_ones_num
-        self.funds_ones_num = funds_ones_num
+        return self.funds_one_hot(funds_ones_num)
+
+    def get_neg_funds_representation(self):
+        funds_ones_num = (-self.available_funds / float(self.config.max_funds)) * self.config.funds_vector_size
+        funds_ones_num = max(min(int(funds_ones_num), self.config.funds_vector_size - 1), 0)
+        return self.funds_one_hot(funds_ones_num)
+
+    def get_spread_representation(self, net_worth, price, ask_price, bid_price):
+        spread_ones_num = 2 * (ask_price - bid_price)/(ask_price + bid_price) * 20 * 400
+        return self.spread_one_hot(spread_ones_num)
+
+    def get_price_representation(self, net_worth, price, ask_price, bid_price):
+        return self.ask_price_one_hot
+
+    def get_pos_inventory_representation(self, net_worth, price, ask_price, bid_price):
+        margin_coeff = 3.0
+        max_inventory = margin_coeff * (self.available_funds / float(self.current_price) + self.inventory)
+        inventory_ones_num = (self.inventory / max_inventory) * self.config.inventory_vector_size        
+        inventory_ones_num = max(min(int(inventory_ones_num), self.config.inventory_vector_size - 1), 0)
+        return self.pos_inventory_one_hot(inventory_ones_num)
+
+    def get_neg_inventory_representation(self, net_worth, price, ask_price, bid_price):
+        margin_coeff = 3.0
+        max_inventory = margin_coeff * (self.available_funds / float(self.current_price) + self.inventory)
+        inventory_ones_num = (-self.inventory / max_inventory) * self.config.inventory_vector_size
+        inventory_ones_num = max(min(int(inventory_ones_num), self.config.inventory_vector_size - 1), 0)
+        return self.neg_inventory_one_hot((inventory_ones_num))
+
+    def get_bought_inventory_avg_price_representation(self, net_worth, price, ask_price, bid_price):
+        return self.bought_inventory_avg_price_one_hot
+
+    def get_position_in_ask_book_representation(self, net_worth, price, ask_price, bid_price, my_order_position):
+        my_ask_order_position, _, ask_book_length, _ = my_order_position
+        position_in_ask_one_num = my_ask_order_position / ask_book_length * self.config.representation_vector_size
+        return self.position_in_ask_book_one_hot(position_in_ask_one_num)
+
+    def get_position_in_bid_book_representation(self, net_worth, price, ask_price, bid_price, my_order_position):
+        _, my_bid_order_position, _, bid_book_length = my_order_position
+        position_in_bid_one_num = my_bid_order_position / bid_book_length * self.config.representation_vector_size
+        return self.position_in_bid_book_one_hot(position_in_bid_one_num)
+
+    def get_price_diff_in_ask_book_representation(self, net_worth, price, ask_price, bid_price):
+        return self.price_diff_in_ask_book_one_hot
+
+    def get_price_diff_in_bid_book_representation(self, net_worth, price, ask_price, bid_price):
+        return self.price_diff_in_bid_book_one_hot
+
+    def get_wealth_accumulation_representation(self, net_worth, price, ask_price, bid_price):
+        wealth_accumulation_one_num = (net_worth / self.initial_investment - 1) * self.config.representation_vector_size
+        return self.wealth_accumulation_one_hot(wealth_accumulation_one_num)
+
+    def get_state(self, net_worth, price, ask_price, bid_price):
+        done = (self.available_funds <=0) and (self.inventory * self.current_price) <= 0 # change to minimum order limit
         return ((self.order_book_state[ASKS_INDEX], self.order_book_state[BIDS_INDEX],
             self.inventory_vector, self.funds_vector), done)
 
@@ -129,6 +179,8 @@ class OrderBook(object):
     def __init__(self, config_file_path, config_name, order_book_data_conveyer, trades):
         self.count = 0
         self.trade_count = 0
+        self.transaction_history_buy = []
+        self.transaction_history_sell = []
         self.order_book_data_conveyer = order_book_data_conveyer
         self.config = CH.ConfigHelper(config_file_path, config_name)
         self.order_book_transformer = OrderBookTransformator()
@@ -147,6 +199,17 @@ class OrderBook(object):
     def get_net_worth(self):
         net_worth = self.state_space.available_funds + self.state_space.inventory * self.get_current_price()
         return net_worth
+    
+    def get_my_order_position(self):
+        my_ask_order_position = -1
+        my_bid_order_position = -1
+        for i in len(self.current_order_book[ASKS_INDEX]):
+            if self.current_order_book[ASKS_INDEX][i][MY_ORDER_INDEX]:
+                my_ask_order_position = i
+        for i in len(self.current_order_book[BIDS_INDEX]):
+            if self.current_order_book[BIDS_INDEX][i][MY_ORDER_INDEX]:
+                my_bid_order_position = i
+        return (my_ask_order_position, my_bid_order_position, len(self.current_order_book[ASKS_INDEX]), len(self.current_order_book[BIDS_INDEX]))
 
     def get_current_price(self):
         return (self.get_current_ask_price() + self.get_current_bid_price()) / 2.0
@@ -168,9 +231,12 @@ class OrderBook(object):
             self.trade_count += 1
     
     def get_state(self):
-        self.state_space.current_price = self.get_current_price()
-        return self.state_space.get_state()
-
+        my_order_position = self.get_my_order_position()
+        net_worth = self.get_net_worth()
+        price = self.get_current_price()
+        ask_price = self.get_current_ask_price()
+        bid_price = self.get_current_bid_price()
+        return self.state_space.get_state(net_worth, price, ask_price, bid_price, my_order_position)
 
     def get_total_amount_before_my_order(self, direction, order_book):
         count = 0
@@ -246,7 +312,7 @@ class OrderBook(object):
             self.count+=1
             self.order_book_transformer.transform_order_book(self.current_order_book)
         result_list = self.settled_transaction()
-        self.state_space.update_state(result_list, self.current_order_book)
+        self.update_state(result_list, self.current_order_book)
         if self.timestamp > self.trades[self.trade_count][TIMESTAMP_INDEX]:
             raise Exception()
         self.timestamp += 1
@@ -255,39 +321,23 @@ class OrderBook(object):
             done = True
         return done
 
-    def settle_trade_deprecated(self, trade, order_book):
-        count = 0
-        reward = 0
-        total_amount = 0
-        transaction_amount = 0
-        transaction_price = 0
-        trade_dict = {TRADE_SELL_INDEX:ASKS_INDEX, TRADE_BUY_INDEX:BIDS_INDEX}
-        direction = trade_dict[trade[TRADE_TYPE_INDEX]]
-        try:
-            while not order_book[direction][count][MY_ORDER_INDEX]:
-                total_amount += float(order_book[direction][count][AMOUNT_INDEX])
-                count+=1
-        except Exception as e:
-            return {AMOUNT_INDEX:0, PRICE_INDEX:0, TRADE_TYPE_INDEX:0}
+    def update_state(self, list_of_transactions):
+        for transaction in list_of_transactions:
+            self.analyze_single_trnsaction(transaction)
 
-        my_trade_amount = float(trade[AMOUNT_INDEX]) - total_amount
-        my_order_amount = order_book[direction][count][AMOUNT_INDEX]
-        if my_trade_amount > 0:
-            if my_order_amount <= my_trade_amount:
-                transaction_amount = my_order_amount
-                transaction_price = order_book[direction][count][PRICE_INDEX]
-                self.order_book_transformer.delete_order(order_book[direction][count][INDEX_INDEX])
-            else:
-                transaction_amount = my_trade_amount
-                transaction_price = order_book[direction][count][PRICE_INDEX]
-                self.order_book_transformer.change_order(order_book[direction][count][PRICE_INDEX],\
-                    my_order_amount - my_trade_amount, order_book[direction][count][INDEX_INDEX])
-        if abs(transaction_amount) > abs(trade[AMOUNT_INDEX]) or abs(transaction_amount) > abs(my_order_amount):
-            import pdb; pdb.set_trace()
-        if transaction_amount < 0:
-            import pdb; pdb.set_trace()
-        return {AMOUNT_INDEX:transaction_amount, PRICE_INDEX:transaction_price,\
-            TRADE_TYPE_INDEX:trade[TRADE_TYPE_INDEX], TRADE_ID_INDEX:trade[TRADE_ID_INDEX]}
+    def analyze_single_trnsaction(self, settled_transaction):
+        if settled_transaction[AMOUNT_INDEX] == 0:
+            return 0
+        if settled_transaction[TRADE_TYPE_INDEX] == TRADE_BUY_INDEX:
+            self.state_space.inventory += settled_transaction[AMOUNT_INDEX]
+            self.state_space.available_funds -= settled_transaction[AMOUNT_INDEX] * settled_transaction[PRICE_INDEX]
+            self.transaction_history_buy.append(settled_transaction[AMOUNT_INDEX], settled_transaction[PRICE_INDEX])
+        elif settled_transaction[TRADE_TYPE_INDEX] == TRADE_SELL_INDEX:
+            self.state_space.inventory -= settled_transaction[AMOUNT_INDEX]
+            self.state_space.available_funds += settled_transaction[AMOUNT_INDEX] * settled_transaction[PRICE_INDEX]
+            self.transaction_history_sell.append(settled_transaction[AMOUNT_INDEX], settled_transaction[PRICE_INDEX])
+        else:
+            raise Exception('Unknown transaction type.')
 
 class OrderBookTransformator(object):
     def __init__(self):
