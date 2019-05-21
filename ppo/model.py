@@ -17,7 +17,6 @@ class Model(object):
     - Save load the model
     """
     def __init__(self, policy, config):
-
         sess = tf.get_default_session()
 
         # CREATE THE PLACEHOLDERS
@@ -33,7 +32,6 @@ class Model(object):
         
         # Cliprange
         cliprange_ = tf.placeholder(tf.float32, [])
-
 
         # CREATE OUR TWO MODELS
         # Step_model that is used for sampling
@@ -116,23 +114,17 @@ class Model(object):
         # 4. Backpropagation
         _train = trainer.apply_gradients(grads)
 
+        self.saver = None
 
         # Train function
-        def train(ask_book_env, bid_book_env, inv_env, funds_env, actions,\
-            returns, values, neglogpacs, lr, cliprange):
-            
+        def train(states, actions, returns, values, neglogpacs, lr, cliprange):
             # Here we calculate advantage A(s,a) = R + yV(s') - V(s)
             # Returns = R + yV(s')
             advantages = returns - values
-
             # Normalize the advantages (taken from aborghi implementation)
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
-
             # We create the feed dictionary
-            td_map = {  train_model.input_ask_book:ask_book_env,
-                        train_model.input_bid_book:bid_book_env,
-                        train_model.input_inventory:inv_env,
-                        train_model.input_funds:funds_env,
+            td_map = {  train_model.input_states:states,
                         actions_: actions,
                         advantages_: advantages,
                         rewards_: returns,
@@ -141,26 +133,25 @@ class Model(object):
                         oldneglopac_: neglogpacs,
                         oldvpred_: values
                      }
-
             policy_loss, value_loss, policy_entropy, _= sess.run([pg_loss, vf_loss, entropy, _train], td_map)
-            
             return policy_loss, value_loss, policy_entropy
-
 
         def save(save_path):
             """
             Save the model
             """
-            saver = tf.train.Saver()
-            saver.save(sess, save_path)
+            if self.saver is None:
+                self.saver = tf.train.Saver()
+            self.saver.save(sess, save_path)
 
         def load(load_path):
             """
             Load the model
             """
-            saver = tf.train.Saver()
+            if self.saver is None:
+                self.saver = tf.train.Saver()
             print('Loading ' + load_path)
-            saver.restore(sess, load_path)
+            self.saver.restore(sess, load_path)
 
         self.train = train
         self.train_model = train_model

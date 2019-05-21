@@ -15,10 +15,10 @@ from baselines.common import explained_variance
 from baselines import logger
 
 def learn(policy, env, config):
-	noptepochs = 8
+	noptepochs = 4
 	nminibatches = 8
 
-	lr = lambda _: 0.0001
+	lr = lambda _: 0.001
 	cliprange = lambda _: 0.1
 
 	if isinstance(lr, float): lr = constfn(lr)
@@ -58,22 +58,16 @@ def learn(policy, env, config):
 		print('{0}/{1}'.format(update, nupdates))
 		# Start timer
 		tstart = time.time()
-
 		frac = 1.0 - (update - 1.0) / nupdates
-
 		# Calculate the learning rate
 		lrnow = lr(frac)
-
 		# Calculate the cliprange
 		cliprangenow = cliprange(frac)
-
 		# Get minibatch
-		ask_book_env, bid_book_env, inv_env, funds_env, returns, actions, values, neglogpacs = runner.run()
-				
+		stated_env, returns, actions, values, neglogpacs = runner.run()
 		# Here what we're going to do is for each minibatch calculate the loss and append it.
 		mb_losses = []
 		total_batches_train = 0
-
 		# Index of each element of batch_size
 		# Create the indices array
 		indices = np.arange(batch_size)
@@ -86,18 +80,14 @@ def learn(policy, env, config):
 				print('Trainer Progress Count: {0}/{1}'.format(start, batch_size), end='\r', flush=True)
 				end = start + batch_train_size
 				mbinds = indices[start:end]
-				slices = (arr[mbinds] for arr in (ask_book_env, bid_book_env, inv_env, funds_env, actions, returns, values, neglogpacs))
+				slices = (arr[mbinds] for arr in (stated_env, actions, returns, values, neglogpacs))
 				mb_losses.append(model.train(*slices, lrnow, cliprangenow))
-	
-		# Feedforward --> get losses --> update
+		# Feedforward --> get losses --> update!
 		lossvalues = np.mean(mb_losses, axis=0)
-
 		# End timer
 		tnow = time.time()
-
 		# Calculate the fps (frame per second)
 		fps = int(batch_size / (tnow - tstart))
-
 		if update % config.log_interval == 0 or update == 1:
 			"""
 			Computes fraction of variance that ypred explains about y.
@@ -117,19 +107,15 @@ def learn(policy, env, config):
 			logger.record_tabular("value_loss", float(lossvalues[1]))
 			logger.record_tabular("explained_variance", float(ev))
 			logger.record_tabular("time elapsed", float(tnow - tfirststart))
-			
 			savepath = config.save_model_path + '/' + str(update) + '/model.ckpt'
 			model.save(savepath)
 			print('Saving to', savepath)
-
 			# Test our agent with 3 trials and mean the score
 			# This will be useful to see if our agent is improving
 			if update % 10 == 0:
 				test_score = testing(model)
 				logger.record_tabular("Mean score test level", test_score)
-
 			logger.dump_tabular()
-			
 	env.close()
 
 def testing(model):
@@ -144,12 +130,12 @@ def testing(model):
 		score = 0
 		i=0
 		while done == False and i < 10000:
-			action, _, _ = model.step(*obs)
+			action, _, _ = model.step(obs)
 			obs, reward, done, t = test_env.step(action)
 			i=i+1
 			score += reward[0]
 			inv = test_env.envs[0].game.order_book.state_space.inventory
-			price = test_env.envs[0].game.order_book.state_space.current_price
+			price = test_env.envs[0].game.order_book.get_current_price()
 			funds = test_env.envs[0].game.order_book.state_space.available_funds
 			net_worth = funds + inv * price
 			print ('nw: {0} | count: {1}'.format(net_worth, i))
