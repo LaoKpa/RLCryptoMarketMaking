@@ -10,8 +10,7 @@ margin_coef = 2
 order_scale_size = 10
 action_arg_num = 4
 
-inventory_vector_size = 400
-funds_vector_size = 400
+representation_vector_size = 400
 
 num_of_envs = 1
 num_of_frames = 5

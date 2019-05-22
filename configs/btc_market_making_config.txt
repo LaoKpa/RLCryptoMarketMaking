@@ -10,8 +10,8 @@ margin_coef = 2
 order_scale_size = 10
 action_arg_num = 4
 
-inventory_vector_size = 400
-funds_vector_size = 400
+representation_vector_size = 400
+num_of_representation_vectors = 17
 
 num_of_envs = 5
 num_of_frames = 5
@@ -24,16 +24,12 @@ order_book_entrie_rep_dim = 5
 
 num_of_buffer_samples = 79600
 
-ask_lstm_output_layer_size = 50
-bid_lstm_output_layer_size = 50
-inventory_fc_layer_size = 100
-funds_fc_layer_size = 100
-ask_book_fc_layer_size = 100
-bid_book_fc_layer_size = 100
-final_fc_layer_size = 150
-final_fc_layer_before_output_size = 100
-stacked_lstm_output_layer_size = 100
+stacked_lstm_output_layer_size = 1000
 
+states_fc_layer_1_size = 2000
+states_fc_layer_2_size = 1500
+states_fc_layer_3_size = 1000
+states_fc_layer_4_size = 1000
 save_model_path = /home/lavi/Documents/RLMM/models
 ent_coef=0.01
 lr=3e-4
@@ -47,3 +43,13 @@ noptepochs=4
 cliprange=0.2
 save_interval=0
 mpi_rank_weight=1
+
+post_lstm_fc_layer_1_size = 1000
+post_lstm_fc_layer_2_size = 1000
+post_lstm_fc_layer_3_size = 1000
+
+vf_fc_layer_1_size = 1000
+vf_fc_layer_2_size = 500
+vf_fc_layer_3_size = 250
+
+save_model_path = /media/lavi/FourTera/RLMM/models

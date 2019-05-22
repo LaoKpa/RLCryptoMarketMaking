@@ -329,12 +329,12 @@ def testing(model):
 		score = 0
 		i=0
 		while done == False and i < 10000:
-			action, _, _ = model.step(*obs)
+			action, _, _ = model.step(obs)
 			obs, reward, done, t = test_env.step(action)
 			i=i+1
 			score += reward[0]
 			inv = test_env.envs[0].game.order_book.state_space.inventory
-			price = test_env.envs[0].game.order_book.state_space.current_price
+			price = test_env.envs[0].game.order_book.get_current_price()
 			funds = test_env.envs[0].game.order_book.state_space.available_funds
 			net_worth = funds + inv * price
 			print ('nw: {0} | count: {1}'.format(net_worth, i))
