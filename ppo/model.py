@@ -121,7 +121,6 @@ class Model(object):
         self.act_model = act_model
         self.step = act_model.step
         self.value = act_model.value
-        self.initial_state = act_model.initial_state
 
         self.save = functools.partial(save_variables, sess=sess)
         self.load = functools.partial(load_variables, sess=sess)
@@ -131,8 +130,7 @@ class Model(object):
         if MPI is not None:
             sync_from_root(sess, global_variables, comm=comm) #pylint: disable=E1101
 
-    def train(self, lr, cliprange, ask_book_env, bid_book_env, inv_env, funds_env,\
-        returns, actions, values, neglogpacs):
+    def train(self, lr, cliprange, ask_book_env, bid_book_env, inv_env, funds_env, returns, actions, values, neglogpacs):
         # Here we calculate advantage A(s,a) = R + yV(s') - V(s)
         # Returns = R + yV(s')
         advs = returns - values

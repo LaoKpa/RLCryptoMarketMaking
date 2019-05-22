@@ -14,7 +14,7 @@ inventory_vector_size = 400
 funds_vector_size = 400
 
 num_of_envs = 1
-num_of_frames = 10
+num_of_frames = 5
 
 nsteps=1
 total_timesteps=10000000
@@ -29,6 +29,5 @@ log_interval = 10
 
 num_of_order_book_entries = 25
 order_book_entrie_rep_dim = 5
-
 
 num_of_buffer_samples = 100000
