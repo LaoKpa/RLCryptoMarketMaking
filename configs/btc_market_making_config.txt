@@ -7,16 +7,15 @@ max_funds = 10000.0
 initial_investment = 1000.0
 margin_coef = 2
 
-order_scale_size = 10
-action_arg_num = 4
+action_arg_num = 13
 
 representation_vector_size = 400
 num_of_representation_vectors = 17
 
-num_of_envs = 5
+num_of_envs = 20
 num_of_frames = 5
 
-nsteps=1024
+nsteps=2048
 total_timesteps=10000000
 
 num_of_order_book_entries = 25
@@ -30,7 +29,7 @@ states_fc_layer_1_size = 2000
 states_fc_layer_2_size = 1500
 states_fc_layer_3_size = 1000
 states_fc_layer_4_size = 1000
-save_model_path = /home/lavi/Documents/RLMM/models
+
 ent_coef=0.01
 lr=3e-4
 max_grad_norm=0.5
@@ -41,7 +40,7 @@ log_interval=1
 nminibatches=4
 noptepochs=4
 cliprange=0.2
-save_interval=0
+save_interval=5
 mpi_rank_weight=1
 
 post_lstm_fc_layer_1_size = 1000
@@ -52,4 +51,5 @@ vf_fc_layer_1_size = 1000
 vf_fc_layer_2_size = 500
 vf_fc_layer_3_size = 250
 
-save_model_path = /media/lavi/FourTera/RLMM/models
+save_model_path = /media/lavi/FourTera/RLMM/models/
+load_model_path = /media/lavi/FourTera/RLMM/models/checkpoints

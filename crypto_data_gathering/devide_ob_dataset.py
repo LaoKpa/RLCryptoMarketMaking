@@ -20,6 +20,7 @@ def generic_data_manipulation_function(order_book_file, order_book_base_path, nu
             except Exception as e:
                 break
     num_of_samples = count
+    parted_time_stamp_list = []
     file_count = 0
     with open(order_book_file, 'rb') as fh:
         while True:
@@ -27,6 +28,9 @@ def generic_data_manipulation_function(order_book_file, order_book_base_path, nu
                 sample_list = []
                 for i in range(num_of_samples // number_of_parts):
                     order_book = pk.load(fh)
+                    if i == 0:
+                        import pdb; pdb.set_trace()
+                        parted_time_stamp_list.append(order_book[0][])
                     sample_list.append(order_book)
                     count+=1
                     print('Count: {0} | {1}'.format(i, file_count), end='\r', flush=True)

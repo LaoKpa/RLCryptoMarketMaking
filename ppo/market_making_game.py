@@ -41,10 +41,11 @@ class DataConveyer(object):
     def __init__(self, data):
         self.data = data
         self.sample_index = 0
+        self.data_len = len(self.data)
 
     def get_next_sample(self):
         sample = self.data[self.sample_index]
-        self.sample_index += 1
+        self.sample_index = (self.sample_index + 1) % self.data_len
         return sample.copy()
 
 class OneHot(object):
@@ -128,18 +129,19 @@ class StateSpace(object):
         max_inventory = margin_coeff * (self.available_funds / float(price) + self.inventory)
         inventory_ones_num = (self.inventory / max_inventory) * self.config.representation_vector_size
         inventory_ones_num = max(min(int(inventory_ones_num), self.config.representation_vector_size - 1), 0)
-        return self.pos_inventory_one_hot.set_new_one(self.intify_vector_size(inventory_ones_num))
+        return self.pos_inventory_one_hot.set_new_one(inventory_ones_num)
 
     def get_neg_inventory_representation(self, net_worth, price, ask_price, bid_price):
         margin_coeff = 3.0
         max_inventory = margin_coeff * (self.available_funds / float(price) + self.inventory)
         inventory_ones_num = (-self.inventory / max_inventory) * self.config.representation_vector_size
         inventory_ones_num = max(min(int(inventory_ones_num), self.config.representation_vector_size - 1), 0)
-        return self.neg_inventory_one_hot.set_new_one(self.intify_vector_size(inventory_ones_num))
+        return self.neg_inventory_one_hot.set_new_one(inventory_ones_num)
 
-    def get_bought_inventory_avg_price_representation(self, net_worth, price, ask_price, bid_price):
-        # TODO add the functionallity 
-        return self.bought_inventory_avg_price_one_hot.set_new_one(0)
+    def get_bought_inventory_avg_price_representation(self, net_worth, price, get_bought_inventory_avg_price):
+        scale_factor = 75.0
+        bought_inventory_avg_price_num = scale_factor * (get_bought_inventory_avg_price / price - 1) * self.config.representation_vector_size + self.config.representation_vector_size/2
+        return self.bought_inventory_avg_price_one_hot.set_new_one(self.intify_vector_size(bought_inventory_avg_price_num))
 
     def get_position_in_ask_book_representation(self, net_worth, price, ask_price, bid_price, my_order_position):
         my_ask_order_position, _, ask_book_length, _, _ = my_order_position
@@ -203,7 +205,7 @@ class StateSpace(object):
         wealth_accumulation_one_num = (net_worth / self.initial_investment - 1) * self.config.representation_vector_size
         return self.wealth_accumulation_one_hot.set_new_one(self.intify_vector_size(wealth_accumulation_one_num))
 
-    def get_state(self, net_worth, price, ask_price, bid_price, my_order_position):
+    def get_state(self, net_worth, price, ask_price, bid_price, my_order_position, get_bought_inventory_avg_price):
         if self.initial_price == 0:
             self.initial_price = price
         representation_list = []
@@ -215,7 +217,7 @@ class StateSpace(object):
         representation_list.append(self.get_bid_price_representation(net_worth, price, ask_price, bid_price))
         representation_list.append(self.get_pos_inventory_representation(net_worth, price, ask_price, bid_price))
         representation_list.append(self.get_neg_inventory_representation(net_worth, price, ask_price, bid_price))
-        representation_list.append(self.get_bought_inventory_avg_price_representation(net_worth, price, ask_price, bid_price))
+        representation_list.append(self.get_bought_inventory_avg_price_representation(net_worth, price, get_bought_inventory_avg_price))
         representation_list.append(self.get_position_in_ask_book_representation(net_worth, price, ask_price, bid_price, my_order_position))
         representation_list.append(self.get_position_in_bid_book_representation(net_worth, price, ask_price, bid_price, my_order_position))
         representation_list.append(self.get_amount_1_in_ask_book_representation(net_worth, price, ask_price, bid_price, my_order_position))
@@ -251,6 +253,26 @@ class OrderBook(object):
         net_worth = self.state_space.available_funds + self.state_space.inventory * self.get_current_price()
         return net_worth
     
+    def get_bought_inventory_avg_price(self):
+        s1 = 0
+        s2 = 0
+        s3 = 0
+        s4 = 0
+        for i in range(len(self.transaction_history_buy)):
+            a_b = self.transaction_history_buy[i][0]
+            p_b = self.transaction_history_buy[i][1]
+            s1 += a_b * p_b
+            s2 += a_b            
+        for i in range(len(self.transaction_history_sell)):
+            a_s = self.transaction_history_sell[i][0]
+            p_s = self.transaction_history_sell[i][1]
+            s3 += a_s * p_s
+            s4 += a_s
+        
+        if not (s2-s4) == 0:
+            return (s1-s3) / (s2-s4)
+        return 0
+
     def get_my_order_position(self):
         my_bid_order_position, my_ask_order_position, ask_amount_0, ask_amount_1, ask_amount_2,\
             ask_amount_3, bid_amount_0, bid_amount_1, bid_amount_2, bid_amount_3 =\
@@ -309,7 +331,8 @@ class OrderBook(object):
         price = self.get_current_price()
         ask_price = self.get_current_ask_price()
         bid_price = self.get_current_bid_price()
-        return self.state_space.get_state(net_worth, price, ask_price, bid_price, my_order_position)
+        bought_inventory_avg_price = self.get_bought_inventory_avg_price()
+        return self.state_space.get_state(net_worth, price, ask_price, bid_price, my_order_position, bought_inventory_avg_price)
 
     def get_total_amount_before_my_order(self, direction, order_book):
         count = 0
@@ -476,37 +499,38 @@ class ActionSpace(object):
             v = int((v-b)/int(x))
         return tmp_array
 
-    def network_action_to_alteration(self, action, dim, current_ask_price, current_bid_price, available_funds, inventory):
-        calc_price = lambda x: 1 + (x - 0.5) * 2 / float(50000)
-        calc_amount = lambda x: (x + 1) * 0.1
-
-        # action_vector = np.zeros(dim ** 4)
-        # action_vector[action] = 1
-        # action_tensor = action_vector.reshape([dim] * 4)
-        # ask_price_arg, bid_price_arg, ask_amount_arg, bid_amount_arg = \
-        #     (np.max(action_tensor.argmax(axis=i)) for i in range(4))
-
-        ask_price_arg, bid_price_arg, ask_amount_arg, bid_amount_arg = self.calc_action_parameters(action)
-
-        current_price = (current_ask_price + current_bid_price) / 2.0
-        net_worth = available_funds + inventory * current_price
-        suggested_ask_price = current_ask_price * calc_price(ask_price_arg / float(self.config.order_scale_size))
-        suggested_bid_price = current_bid_price * calc_price(bid_price_arg / float(self.config.order_scale_size))
-        
+    def network_action_to_alteration(self, action, bots_ask_price, bots_bid_price, bots_ask_amount, bots_bid_amount, price, net_worth):
         # print('ask: {0}, ask_price: {1}, sugg_ask_price: {2}, bid: {3}, bid_price: {4}, sugg_bid_price: {5}'.format\
         #     (ask_price_arg, current_ask_price, suggested_ask_price, bid_price_arg, current_bid_price, suggested_bid_price))
-
-        suggested_ask_amount = (net_worth / current_ask_price) * calc_amount(ask_amount_arg / float(self.config.order_scale_size))
-        suggested_bid_amount = (net_worth / current_bid_price) * calc_amount(bid_amount_arg / float(self.config.order_scale_size))
-
-        if suggested_ask_amount > 50 or suggested_bid_amount > 50:
-            import pdb; pdb.set_trace()
-
-        if suggested_ask_amount <= 0 or suggested_bid_amount <= 0:
-            import pdb; pdb.set_trace()
         # print('{0} | ask: {1} | bid: {2} | {3}'.format(suggested_ask_amount, suggested_ask_price, suggested_bid_price, suggested_bid_amount))
         # print('real ask: {0} | real bid: {1}'.format(current_ask_price, current_bid_price))
-        return [(suggested_ask_price, suggested_ask_amount, TRADE_SELL_INDEX), (suggested_bid_price, suggested_bid_amount, TRADE_BUY_INDEX)]
+        if action == 0:
+            bots_ask_price += price * 0.00005
+        if action == 1:
+            bots_ask_price += price * 0.0005
+        if action == 2:
+            bots_bid_price += price * 0.00005
+        if action == 3:
+            bots_bid_price += price * 0.0005
+        if action == 4:
+            bots_ask_amount += net_worth / price * 0.001
+        if action == 5:
+            bots_ask_amount += net_worth / price * 0.001
+        if action == 6:
+            bots_ask_price -= price * 0.00005
+        if action == 7:
+            bots_ask_price -= price * 0.0005
+        if action == 8:
+            bots_bid_price -= price * 0.00005
+        if action == 9:
+            bots_bid_price -= price * 0.0005
+        if action == 10:
+            bots_ask_amount -= net_worth / price * 0.001
+        if action == 11:
+            bots_ask_amount -= net_worth / price * 0.001
+        if action == 12:
+            pass
+        return (bots_ask_price, bots_bid_price, bots_ask_amount, bots_bid_amount)
 
 class Rewarder(object):
     def __init__(self):
@@ -524,7 +548,7 @@ class Rewarder(object):
             return p
         current_net_worth = inv * price + funds
         prev_net_worth = prev_inv * price + prev_funds
-        gain = current_net_worth - prev_net_worth
+        gain = (current_net_worth / prev_net_worth - 1) * 1000
         # print('GAIN: {0}'.format(gain))
         return gain
 
@@ -532,6 +556,13 @@ class MarketMakingGame(object):
     def __init__(self, config_file_path, config_name, order_book_data_conveyer, trades):
         self.order_book = OrderBook(config_file_path, config_name, order_book_data_conveyer, trades)
         self.action_space = ActionSpace(config_file_path, config_name)
+
+        self.bots_ask_price = self.order_book.get_current_ask_price()
+        self.bots_bid_price = self.order_book.get_current_bid_price()
+
+        self.bots_ask_amount = self.order_book.get_net_worth() / self.order_book.get_current_price() * 0.1
+        self.bots_bid_amount = self.order_book.get_net_worth() / self.order_book.get_current_price() * 0.1
+
         self.rewarder = Rewarder()
         self.margin_coef = self.order_book.config.margin_coef
         self.order_index = None
@@ -541,9 +572,11 @@ class MarketMakingGame(object):
         return self.order_book.get_state()
 
     def make_action(self, action_vector):
-        ask_order, bid_order = self.action_space.network_action_to_alteration(action_vector, 5,
-        self.order_book.get_current_ask_price(), self.order_book.get_current_bid_price(),
-        self.order_book.state_space.available_funds, self.order_book.state_space.inventory)
+        self.bots_ask_price, self.bots_bid_price, self.bots_ask_amount, self.bots_bid_amount =\
+            self.action_space.network_action_to_alteration\
+                (action_vector, self.bots_ask_price, self.bots_bid_price, self.bots_ask_amount, self.bots_bid_amount,\
+                    self.order_book.get_current_price(), self.order_book.get_net_worth())
+        ask_order, bid_order = [(self.bots_ask_price, self.bots_ask_amount, TRADE_SELL_INDEX), (self.bots_bid_price, self.bots_bid_amount, TRADE_BUY_INDEX)]
         if self.order_index != None:
             self.count = 1
             if not self.order_index['ask'] == 0:
@@ -586,7 +619,7 @@ class MarketMakingGame(object):
         price = self.order_book.get_current_price()
         # print('nw2: {0}'.format(self.order_book.get_net_worth()))
 
-        reward = 100 * self.rewarder.get_reward(self.order_book.state_space.inventory, tmp_inv,
+        reward = 10 * self.rewarder.get_reward(self.order_book.state_space.inventory, tmp_inv,
                                           self.order_book.state_space.available_funds, tmp_funds,
                                           self.order_book.get_current_price())
 
@@ -640,15 +673,21 @@ class ParallelGameEnvironment(object):
     def __init__(self, config_file_path, config_name):
         self.config = CH.ConfigHelper(config_file_path, config_name)
         t1 = tm.time()
-        dcs = self.get_data_conveyer(self.config.order_book_base_path)
+        self.dcs = self.get_data_conveyer(self.config.order_book_base_path)
         print('Elapsed DCS: {0}.'.format(tm.time()-t1))
         with open(self.config.trades_file, 'rb') as fh:
             self.trades = np.load(fh)
-        self.envs = [GameWrapper(MarketMakingGame(config_file_path, config_name, dcs[j], self.trades),
+        self.envs = [GameWrapper(MarketMakingGame(config_file_path, config_name, self.dcs[j], self.trades),
             self.config.num_of_frames) for j in range(self.config.num_of_envs)]
         self.initial_state = [env.current_state for env in self.envs]
         self.num_envs = self.config.num_of_envs
-    
+        self.config_file_path = config_file_path
+        self.config_name = config_name
+
+    def re_init(self):
+        self.envs = [GameWrapper(MarketMakingGame(self.config_file_path, self.config_name, self.dcs[j], self.trades),
+            self.config.num_of_frames) for j in range(self.config.num_of_envs)]
+
     def get_data_conveyer(self, order_book_base_path):
         dcs = []
         for i in range(self.config.num_of_envs):

@@ -130,7 +130,7 @@ class Model(object):
         if MPI is not None:
             sync_from_root(sess, global_variables, comm=comm) #pylint: disable=E1101
 
-    def train(self, lr, cliprange, ask_book_env, bid_book_env, inv_env, funds_env, returns, actions, values, neglogpacs):
+    def train(self, lr, cliprange, obs, returns, actions, values, neglogpacs):
         # Here we calculate advantage A(s,a) = R + yV(s') - V(s)
         # Returns = R + yV(s')
         advs = returns - values
@@ -139,10 +139,7 @@ class Model(object):
         advs = (advs - advs.mean()) / (advs.std() + 1e-8)
 
         td_map = {
-            self.train_model.input_ask_book:ask_book_env,
-            self.train_model.input_bid_book:bid_book_env,
-            self.train_model.input_inventory:inv_env,
-            self.train_model.input_funds:funds_env,
+            self.train_model.input_states:obs,
             self.A : actions,
             self.ADV : advs,
             self.R : returns,

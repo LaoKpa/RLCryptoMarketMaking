@@ -16,13 +16,12 @@ class MarketMakingPolicy(object):
         # Based on the action space, will select what probability distribution type
         # we will use to distribute action in our stochastic policy (in our case DiagGaussianPdType
         # aka Diagonal Gaussian, 3D normal distribution
-        self.pdtype = make_pdtype(gym.spaces.Discrete(config.order_scale_size ** config.action_arg_num))
+        self.pdtype = make_pdtype(gym.spaces.Discrete(config.action_arg_num))
 
         self.input_states = tf.placeholder(tf.float32,\
             [None, self.config.num_of_frames, self.config.num_of_representation_vectors, self.config.representation_vector_size], name="input_states")
 
         with tf.variable_scope("model", reuse = reuse):
-            
             reshaped_input_states = tf.reshape(self.input_states, (tf.shape(self.input_states)[0],\
                 self.config.num_of_frames, self.config.num_of_representation_vectors * self.config.representation_vector_size))
 

@@ -25,6 +25,7 @@ class Runner(object):
         # Here, we init the lists that will contain the mb of experiences
         mb_rewards, mb_actions, mb_values, mb_neglogpacs, mb_dones = [],[],[],[],[]
         mb_state_env = []
+        self.env.re_init()
         # For n in range number of steps
         for i in range(self.nsteps):
             # Given observations, get action value and neglopacs
