@@ -10,6 +10,7 @@ import threading
 import time
 
 NUM_OF_PRICE_POINTS = 25
+HEART_BEAT = 'hb'
 
 class WebSocketOrderBook(object):
     def __init__(self, raw_socket_data):
@@ -25,24 +26,28 @@ class WebSocketOrderBook(object):
             raise Exception('Wrong bid amount direction.')
 
     def add_update_asks(self, price, count, amount):
+        price_exists = False
         for i in range(len(self.ask)):
             if self.ask[i][0] == price:
                 price_exists = True
                 price_count = i
+                break
         if price_exists:
-            self.ask[i] = [price, count, amount]
+            self.ask[price_count] = [price, count, amount]
         else:
             self.ask.append([price, count, amount])
         self.ask.sort(key=lambda k: k[0])
         self.ask = self.ask[:NUM_OF_PRICE_POINTS]
 
     def add_update_bids(self, price, count, amount):
+        price_exists = False
         for i in range(len(self.bid)):
             if self.bid[i][0] == price:
                 price_exists = True
                 price_count = i
+                break
         if price_exists:
-            self.bid[i] = [price, count, amount]
+            self.bid[price_count] = [price, count, amount]
         else:
             self.bid.append([price, count, amount])
         self.bid.sort(key=lambda k: -k[0])
@@ -69,6 +74,8 @@ class WebSocketOrderBook(object):
             raise Exception('Wrong removal')
 
     def update_book(self, update):
+        if HEART_BEAT in update:
+            return
         price, count, amount = update[1]
         if count > 0:
             if amount < 0:
@@ -95,6 +102,10 @@ class WebSocketThread(threading.Thread):
     def get_next_update(self):
         if len(self.res_list) > 0:
             return self.res_list.pop(0)
+    def wait_for_next_update(self):
+        while not len(self.res_list) > 0:
+            pass
+        return self.get_next_update()
     def get_update_by_index(self, index):
         if len(self.res_list) > index:
             for i in range(index):
@@ -109,6 +120,11 @@ class WebSocketThread(threading.Thread):
     def run(self):
        self.ws.run_forever()
 
+def print_order_book(ob):
+    print(tb.tabulate([[a,b] for (a, b) in zip(ob.ask, ob.bid)], headers=['Ask', 'Bid']))
+
+import os
+import tabulate as tb
 def main():
     wst = WebSocketThread()
     wst.start()
@@ -116,7 +132,10 @@ def main():
     raw_socket_data = wst.get_update_by_index(2)
     wsob = WebSocketOrderBook(raw_socket_data)
     while True:
-        wsob.update_book(json.loads(wst.get_next_update()))
+        resp = wst.wait_for_next_update()
+        wsob.update_book(json.loads(resp))
+        os.system('clear')
+        print_order_book(wsob)
 
 if __name__ == '__main__':
     main()
