@@ -1,6 +1,6 @@
 
 import sys
-import time
+import time as tm
 
 import pickle as pk
 import websocket as wbs
@@ -9,17 +9,31 @@ import json
 import threading
 import time
 
+import os
+import tabulate as tb
+
 NUM_OF_PRICE_POINTS = 25
 HEART_BEAT = 'hb'
 
 class WebSocketOrderBook(object):
     def __init__(self, raw_socket_data):
         self.ask, self.bid = [], []
+        self.is_book_initialized = False
         self.process_raw_data(json.loads(raw_socket_data))
+
+    def get_ask_price(self):
+        return self.ask[0][0]
+
+    def get_bid_price(self):
+        return self.bid[0][0]
 
     def process_raw_data(self, raw_socket_data):
         self.ask = raw_socket_data[1][NUM_OF_PRICE_POINTS:]
         self.bid = raw_socket_data[1][:NUM_OF_PRICE_POINTS]
+        if len(self.ask) == NUM_OF_PRICE_POINTS and len(self.bid) == NUM_OF_PRICE_POINTS:
+            self.is_book_initialized = True
+        else:
+            raise Exception('Wrong book size.')
         if any([a[-1] > 0 for a in self.ask]):
             raise Exception('Wrong ask amount direction.')
         if any([b[-1] < 0 for b in self.bid]):
@@ -93,11 +107,12 @@ class WebSocketOrderBook(object):
             raise Exception('Wrong count')
 
 class WebSocketThread(threading.Thread):
-    def __init__(self):
+    def __init__(self, symbol):
         threading.Thread.__init__(self)
         self.res_list = []
         self.ws = wbs.WebSocketApp('wss://api-pub.bitfinex.com/ws/2')
-        self.ws.on_open = lambda s: s.send('{ "event": "subscribe", "channel": "book", "symbol": "tBTCUSD"}')
+        self.ws.on_open = lambda s: s.send\
+            ('{ "event": "subscribe", "channel": "book", "symbol": "'+symbol+'"}')
         self.ws.on_message = lambda s, evt:  self.res_list.append(evt)
     def get_next_update(self):
         if len(self.res_list) > 0:
@@ -120,22 +135,29 @@ class WebSocketThread(threading.Thread):
     def run(self):
        self.ws.run_forever()
 
+class OrderBookThread(threading.Thread):
+    def __init__(self, symbol):
+        threading.Thread.__init__(self)
+        self.wst = WebSocketThread(symbol)
+        self.wst.start()
+        self.wst.wait_for_capacity(3)
+        raw_socket_data = self.wst.get_update_by_index(2)
+        self.wsob = WebSocketOrderBook(raw_socket_data)
+    def run(self):
+        while True:
+            resp = self.wst.wait_for_next_update()
+            self.wsob.update_book(json.loads(resp))
+
 def print_order_book(ob):
     print(tb.tabulate([[a,b] for (a, b) in zip(ob.ask, ob.bid)], headers=['Ask', 'Bid']))
 
-import os
-import tabulate as tb
 def main():
-    wst = WebSocketThread()
-    wst.start()
-    wst.wait_for_capacity(3)
-    raw_socket_data = wst.get_update_by_index(2)
-    wsob = WebSocketOrderBook(raw_socket_data)
+    obt = OrderBookThread(sys.argv[1])
+    obt.start()
     while True:
-        resp = wst.wait_for_next_update()
-        wsob.update_book(json.loads(resp))
         os.system('clear')
-        print_order_book(wsob)
+        print_order_book(obt.wsob)
+        tm.sleep(0.01)
 
 if __name__ == '__main__':
     main()
