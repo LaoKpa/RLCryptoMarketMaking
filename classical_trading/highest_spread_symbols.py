@@ -24,6 +24,7 @@ def get_sorted_symbols(relative_spread_treshold):
 	details = get_symbols_details()
 	get_details = lambda sym: [p for p in details if p['pair'].upper()==sym[SYMBOL_INDEX][1:]][0]
 	for s in symbols:
+		print(s)
 		if s[SYMBOL_INDEX][0] == 't':
 			symbol_details = get_details(s)
 			price = (s[ASK_INDEX] + s[BID_INDEX]) / 2.0
