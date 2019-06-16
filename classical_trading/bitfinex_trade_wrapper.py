@@ -37,8 +37,8 @@ class BitfinexTradeWrapper(object):
             cprint('Exception Occured In {0} order: {1}. Type: {2}.'.\
             format(order, e, type(e)), 'blue')
             import pdb; pdb.set_trace()
-            return False
-        return result
+            return [False, None]
+        return [True, result]
 
     def place_order(self, amount, price, side, ordertype, symbol):
         try:
@@ -47,8 +47,8 @@ class BitfinexTradeWrapper(object):
             cprint('Exception Occured In {0} order: {1}. Type: {2}.'.\
             format(order, e, type(e)), 'blue')
             import pdb; pdb.set_trace()
-            return False
-        return result
+            return [False, None]
+        return [True, result]
 
     def get_order_id(self, order_result, err_msg):
         try:

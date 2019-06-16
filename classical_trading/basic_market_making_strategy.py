@@ -13,45 +13,31 @@ def generic_find(l, lam):
         if lam(l[i]):
             return i
 
-class LimitOrderPosition:
-    def __init__(self):
-        self.price = 0
-        self.amount = 0
-        self.is_active = False
-        self.is_filled = False
-        self.is_initialized = False
-        self.is_partially_filled = False
-        self.filled_percentage = 0
-
 class BasicMarketMakingStrategy(object):
-    def __init__(self, symbol):
+    def __init__(self, symbol, req_profit):
         self.order_book = bobc.OrderBookThread(symbol)
         self.order_book.start()
+        self.req_profit = req_profit
         self.symbol = symbol
         self.low_case_symbol = self.symbol[1:].lower()
         if not self.order_book.wsob.is_book_initialized:
             raise Exception('Order book did not initialized correctly.')
-        self.bitfinex_trade_handler = btw.BitfinexTradeWrapper(btw.BITFINEX_KEY, btw.BITFINEX_SECRET)
         self.bid_position = LimitOrderPosition()
         self.ask_position = LimitOrderPosition()
+    
+    def get_position_by_side(self, side):
+        return {'bid':self.bid_position, 'ask':self.ask_position}[side]
 
     def get_order_book_precedenes():
         current_ask_book = self.order_book.wsob.ask.copy()
         current_bid_bbok =  self.order_book.wsob.bid.copy()
-        generic_find(current_ask_book, lambda item: item[0])
-
-    def put_bid_order(self, amount, price):
-        return self.bitfinex_trade_handler.place_order\
-            (amount, price, 'buy', 'limit', self.low_case_symbol)
-
-    def put_ask_order(self, amount, price):
-        return self.bitfinex_trade_handler.place_order\
-            (amount, price, 'sell', 'limit', self.low_case_symbol)
+        ask_precedenes = generic_find(current_ask_book, lambda item: item[0] == self.ask_position.price)
+        bid_precedenes = generic_find(current_bid_book, lambda item: item[0] == self.bid_position.price)
+        return ['ask_prec':ask_precedenes, 'bid_prec':bid_precedenes]
 
     def check_for_other_bots(self):
         current_ask_price = self.order_book.wsob.get_ask_price()
         current_bid_price = self.order_book.wsob.get_bid_price()
-
 
     def set_bid_ask_orders_current_price(self):
         current_ask_price = self.order_book.wsob.get_ask_price()
@@ -61,7 +47,39 @@ class BasicMarketMakingStrategy(object):
         t2 = tm.time()
         print('Order Elapsed: {0}.', t2-t1)
         import pudb; pudb.set_trace()
-        print('duck')
+        print('test')
+
+# self.price = 0
+# self.amount = 0
+# self.is_active = False
+# self.is_filled = False
+# self.is_initialized = False
+# self.is_partially_filled = False
+# self.filled_percentage = 0
+
+    def profitability_treshold(self, price, side):
+        if side == 'bid':
+            bid_price = price
+            ask_price = self.ask_position.price
+        elif side == 'ask':
+            bid_price = self.bid_position.price
+            ask_price = price
+        else:
+            raise Exception('Undefined position side.')
+        unit_profit = ask_price * (1 - 0.001) - bid_price * (1 + 0.001)
+        unit_profit_percent = unit_profit / (ask_price + bid_price)
+        if unit_profit_percent > self.req_profit:
+            return [True, unit_profit_percent]
+        else:
+            return [False, unit_profit_percent]
+
+    def basic_market_making_strategy(self):
+        
+    def rebalance_position(self, side):
+        position = self.get_position_by_side(side)
+        is_profitable, _ = self.profitability_treshold(new_price, side)
+        if is_profitable:
+            self.put_order(position.amount, new_peice)
 
 """
 Get bid/ask prices
@@ -75,25 +93,3 @@ If there is competition:
         Increase/Descrease bid/ask while keeping a profitable margin until first in line
 """
 
-# 
-# {'exchange': 'bitfinex',
-#  'is_cancelled': False,
-#  'gid': None,
-#  'timestamp': '1560266870.53677338',
-#  'price': '1.6459',
-#  'side': 'buy',
-#  'original_amount': '10.0',
-#  'avg_execution_price': '0.0',
-#  'symbol': 'etpusd',
-#  'id': 26557157187,
-#  'is_live': True,
-#  'cid_date': '2019-06-11',
-#  'order_id': 26557157187,
-#  'was_forced': False,
-#  'oco_order': None,
-#  'remaining_amount': '10.0',
-#  'executed_amount': '0.0',
-#  'cid': 55670522797,
-#  'type': 'limit',
-#  'src': 'api',
-#  'is_hidden': False}
