@@ -1,2 +1,207 @@
 '[0,"tu",[368427602,"tETHUSD",1560916272774,26939383933,0.02,266.59,"LIMIT",266.6,-1,-0.0106636,"USD"]]'
 '[0,"te",[368427602,"tETHUSD",1560916272774,26939383933,0.02,266.59,"LIMIT",266.6,-1,null,null,83902657]]'
+
+
+'''
+Trade updates:
+		self.chanle_id
+		self.event_string
+		self.trade_id
+		self.symbol
+	X    self.time_stamp
+		self.order_id
+	X    self.exec_amount
+	X    self.exec_price
+		self.orderer_type
+		self.order_price
+	X    self.maker
+	X    self.fee
+	X    self.fee_currnecy
+Order updates (on/ou/oc):
+		self.request_string
+		self.order_id
+		self.order_cid
+		self.symbol
+	X    self.amount
+		self.type
+	X    self.is_active
+	X    self.price
+Order stream updates:
+		self.chanle_id
+		self.event_string
+		self.order_id
+		self.order_gid
+		self.order_cid
+		self.symbol
+	X    self.mts_create
+	X    self.mts_update
+	X    self.amount
+	X    self.amount_orig
+		self.type
+		self.type_prev
+		self.mts_tif
+		self.flags
+	X    self.status
+	X    self.status_dictionaty
+		self.price
+		self.price_avg
+		self.price_aux_limit
+		self.notify
+		self.hidden
+		self.placed_id
+		self.routing
+'''
+'''
+ID	int	Order ID
+GID	int	Group ID
+CID	int	Client Order ID
+SYMBOL	string	Pair (tBTCUSD, …)
+MTS_CREATE	int	Millisecond timestamp of creation
+MTS_UPDATE	int	Millisecond timestamp of update
+AMOUNT	float	Positive means buy, negative means sell.
+AMOUNT_ORIG	float	Original amount
+TYPE	string	The type of the order: LIMIT, MARKET, STOP, TRAILING STOP, EXCHANGE MARKET, EXCHANGE LIMIT, EXCHANGE STOP, EXCHANGE TRAILING STOP, FOK, EXCHANGE FOK, IOC, EXCHANGE IOC.
+TYPE_PREV	string	Previous order type
+MTS_TIF	int	Millisecond timestamp of Time-In-Force: automatic order cancellation
+ORDER_STATUS	string	Order Status: ACTIVE, EXECUTED @ PRICE(AMOUNT) e.g. "EXECUTED @ 107.6(-0.2)", PARTIALLY FILLED @ PRICE(AMOUNT), INSUFFICIENT MARGIN was: PARTIALLY FILLED @ PRICE(AMOUNT), CANCELED, CANCELED was: PARTIALLY FILLED @ PRICE(AMOUNT)
+PRICE	float	Price
+PRICE_AVG	float	Average price
+PRICE_TRAILING	float	The trailing price
+PRICE_AUX_LIMIT	float	Auxiliary Limit price (for STOP LIMIT)
+PLACED_ID	int	If another order caused this order to be placed (OCO) this will be that other order's ID
+ROUTING	string	indicates origin of action: BFX, ETHFX, API>BFX, API>ETHFX
+FLAGS	int	See https://docs.bitfinex.com/v2/docs/flag-values.
+'''
+
+
+########################################################################
+order_confirmation_stack length: 3
+order_request_stack length: 0
+authentication_stack length: 0
+approved_order_confirmation_stack length: 0
+trade_event_stack length: 3
+trade_update_stack length: 3
+order_stream_stack length: 1
+
+-------------------------------------------------------------------------
+
+x.order_confirmation_stack[0]:
+{'amount': 10,
+ 'is_active': 'ACTIVE',
+ 'order_cid': 1563019606913,
+ 'order_id': 28272039583,
+ 'price': 1.5594,
+ 'request_string': 'on',
+ 'symbol': 'tETPUSD',
+ 'type': 'LIMIT'}
+
+x.order_confirmation_stack[1]:
+{'amount': 4.38021423,
+ 'is_active': 'PARTIALLY FILLED @ 1.5622(0.00078577), PARTIALLY FILLED @ '
+              '1.5699(25.619)',
+ 'order_cid': 1563019606913,
+ 'order_id': 28272039583,
+ 'price': 1.5699,
+ 'request_string': 'ou',
+ 'symbol': 'tETPUSD',
+ 'type': 'LIMIT'}
+
+x.order_confirmation_stack[2]:
+{'amount': 0,
+ 'is_active': 'EXECUTED @ 1.5699(4.38021423): was PARTIALLY FILLED @ '
+              '1.5622(0.00078577), PARTIALLY FILLED @ 1.5699(25.619)',
+ 'order_cid': 1563019606913,
+ 'order_id': 28272039583,
+ 'price': 1.5699,
+ 'request_string': 'oc',
+ 'symbol': 'tETPUSD',
+ 'type': 'LIMIT'}
+
+-------------------------------------------------------------------------------
+
+x.trade_event_stack[0]:
+{'chanle_id': 0,
+ 'event_string': 'te',
+ 'exec_amount': 0.00078577,
+ 'exec_price': 1.5622,
+ 'maker': -1,
+ 'order_id': 28272039583,
+ 'order_price': 1.5699,
+ 'orderer_type': 'LIMIT',
+ 'symbol': 'tETPUSD',
+ 'time_stamp': 1563019729400,
+ 'trade_id': 377400231}
+
+x.trade_event_stack[1]:
+{'chanle_id': 0,
+ 'event_string': 'te',
+ 'exec_amount': 25.619,
+ 'exec_price': 1.5699,
+ 'maker': -1,
+ 'order_id': 28272039583,
+ 'order_price': 1.5699,
+ 'orderer_type': 'LIMIT',
+ 'symbol': 'tETPUSD',
+ 'time_stamp': 1563019729400,
+ 'trade_id': 377400232}
+
+x.trade_event_stack[2]:
+{'chanle_id': 0,
+ 'event_string': 'te',
+ 'exec_amount': 4.38021423,
+ 'exec_price': 1.5699,
+ 'maker': 1,
+ 'order_id': 28272039583,
+ 'order_price': 1.5699,
+ 'orderer_type': 'LIMIT',
+ 'symbol': 'tETPUSD',
+ 'time_stamp': 1563019729400,
+ 'trade_id': 377400233}
+
+----------------------------------------------------------------------
+
+x.trade_update_stack[0]:
+{'chanle_id': 0,
+ 'event_string': 'tu',
+ 'exec_amount': 0.00078577,
+ 'exec_price': 1.5622,
+ 'fee': -2.468276e-06,
+ 'fee_currnecy': 'USD',
+ 'maker': -1,
+ 'order_id': 28272039583,
+ 'order_price': 1.5699,
+ 'orderer_type': 'LIMIT',
+ 'symbol': 'tETPUSD',
+ 'time_stamp': 1563019729400,
+ 'trade_id': 377400231}
+
+x.trade_update_stack[1]:
+{'chanle_id': 0,
+ 'event_string': 'tu',
+ 'exec_amount': 25.619,
+ 'exec_price': 1.5699,
+ 'fee': -0.0804385362,
+ 'fee_currnecy': 'USD',
+ 'maker': -1,
+ 'order_id': 28272039583,
+ 'order_price': 1.5699,
+ 'orderer_type': 'LIMIT',
+ 'symbol': 'tETPUSD',
+ 'time_stamp': 1563019729400,
+ 'trade_id': 377400232}
+
+x.trade_update_stack[2]:
+{'chanle_id': 0,
+ 'event_string': 'tu',
+ 'exec_amount': 4.38021423,
+ 'exec_price': 1.5699,
+ 'fee': -0.006876507378,
+ 'fee_currnecy': 'USD',
+ 'maker': 1,
+ 'order_id': 28272039583,
+ 'order_price': 1.5699,
+ 'orderer_type': 'LIMIT',
+ 'symbol': 'tETPUSD',
+ 'time_stamp': 1563019729400,
+ 'trade_id': 377400233}
+######################################################
