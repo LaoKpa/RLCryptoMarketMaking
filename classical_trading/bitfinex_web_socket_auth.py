@@ -50,12 +50,12 @@ class OrderRepresentation(object):
 		self.price = order_confirmation.price
 		self.order_type = order_confirmation.order_type
 		self.is_active = order_confirmation.is_active
-		self.chanle_id = None
+		self.chanle_id = 0
 		self.exec_amount = 0
 		self.exec_price = 0
 		self.fee = 0
-		self.fee_currnecy = None
-		self.maker = None
+		self.fee_currnecy = ''
+		self.maker = []
 
 class OrderStreamUpdateParser(object):
 	def __init__(self, order_request_responsoe):
@@ -154,7 +154,7 @@ class OrderRequestParser(object):
 		self.is_active = order_request_responsoe[2][4][13]
 		self.price = order_request_responsoe[2][4][16]
 		self.mts_update = order_request_responsoe[2][5]
-		self.is_successful = order_request_responsoe[2
+		self.is_successful = order_request_responsoe[2][6]
 		self.mts_update = order_request_responsoe[2][5]
 		self.message = order_request_responsoe[2][7]
 
@@ -312,10 +312,32 @@ class BitfinexWebSocketClient(threading.Thread):
  'time_stamp': 1563019729400,
  'trade_id': 377400231}
 
+self.order_id = order_confirmation.order_id
+self.order_cid = order_confirmation.order_cid
+self.symbol = order_confirmation.symbol
+self.amount = order_confirmation.amount
+self.price = order_confirmation.price
+self.order_type = order_confirmation.order_type
+self.is_active = order_confirmation.is_active
+self.chanle_id = None
+self.exec_amount = 0
+self.exec_price = 0
+self.fee = 0
+self.fee_currnecy = None
+self.maker = None
+
+
 	def process_order_update(self, resp_factory_object):
 		if type(resp_factory_object) is TradeUpdateParser:
 			if resp_factory_object.order_id in self.active_orders.keys():
-				self.self.active_orders[resp_factory_object.order_id]
+				self.self.active_orders[resp_factory_object.order_id].chanle_id = resp_factory_object.chanle_id
+				e_p = self.self.active_orders[resp_factory_object.order_id].exec_price
+				e_a = self.self.active_orders[resp_factory_object.order_id].exec_amount
+				self.self.active_orders[resp_factory_object.order_id].exec_amount += resp_factory_object.exec_amount
+				self.self.active_orders[resp_factory_object.order_id].exec_price = (e_p*e_a + resp_factory_object.exec_amount * resp_factory_object.exec_price)/(e_a + resp_factory_object.exec_amount)
+				self.self.active_orders[resp_factory_object.order_id].fee += resp_factory_object.fee
+				self.self.active_orders[resp_factory_object.order_id].fee_currnecy = resp_factory_object.fee_currnecy
+				self.self.active_orders[resp_factory_object.order_id].maker += [resp_factory_object.maker]
 			else:
 				raise Exception('Processed order is not in active orders list.')
 		elif type(resp_factory_object) is OrderStreamUpdateParser:
