@@ -23,22 +23,67 @@ def verify_response(resp_stack, lam):
 				resp_stack.remove(q)
 				return (True, q)
 
-class Order(object):
-	def __init__(self):
-		self.order_id
-		self.order_cid
-		self.chanle_id
-		self.symbol
-		self.amount
-		self.price
-		self.exec_amount
-		self.exec_price
-		self.is_active
-		self.order_type
-		self.fee
-		self.fee_currnecy
-		self.maker
-		self.time_stamp
+def parse_update_status(order_status_string):
+	def parse_splitted_order_status(order_status):
+		splitted_order_status = order_status.replace(' ', '').split('@')
+		executed_amount = float(splitted_order_status[1].split('(')[1].split(')')[0])
+		executed_price = float(splitted_order_status[1].split('(')[0])
+		order_status_status = splitted_order_status[0]
+		return executed_amount, executed_price, order_status_status
+	if 'was' in order_status_string:
+		order_error, splitted_order_status = order_status_string.replace(' ', '').split('was:')
+		executed_amount, executed_price, order_status_status = parse_splitted_order_status(splitted_order_status)
+		return {'order_error':order_error, 'executed_amount':executed_amount, 'executed_price':executed_price, 'order_status_status':order_status_status}
+	elif '@' in order_status_string:
+		executed_amount, executed_price, order_status_status = parse_splitted_order_status(order_status_string)
+		return {'executed_amount':executed_amount, 'executed_price':executed_price, 'order_status_status':order_status_status}
+	else:
+		splitted_order_status = order_status_string.replace(' ', '')
+		return {'order_status_status':splitted_order_status}
+
+class OrderRepresentation(object):
+	def __init__(self, order_confirmation):
+		self.order_id = order_confirmation.order_id
+		self.order_cid = order_confirmation.order_cid
+		self.symbol = order_confirmation.symbol
+		self.amount = order_confirmation.amount
+		self.price = order_confirmation.price
+		self.order_type = order_confirmation.order_type
+		self.is_active = order_confirmation.is_active
+		self.chanle_id = None
+		self.exec_amount = 0
+		self.exec_price = 0
+		self.fee = 0
+		self.fee_currnecy = None
+		self.maker = None
+
+class OrderStreamUpdateParser(object):
+	def __init__(self, order_request_responsoe):
+		self.chanle_id = order_request_responsoe[0]
+		self.event_string = order_request_responsoe[1]
+		if order_request_responsoe[2] == []:
+			return
+		self.order_id = order_request_responsoe[2][0]
+		self.order_gid = order_request_responsoe[2][1]
+		self.order_cid = order_request_responsoe[2][2]
+		self.symbol = order_request_responsoe[2][3]
+		self.mts_create = order_request_responsoe[2][4]
+		self.mts_update = order_request_responsoe[2][5]
+		self.amount = order_request_responsoe[2][6]
+		self.amount_orig = order_request_responsoe[2][7]
+		self.type = order_request_responsoe[2][8]
+		self.type_prev = order_request_responsoe[2][9]
+		self.flags = order_request_responsoe[2][12]
+		self.status = order_request_responsoe[2][13]
+		self.status_dictionaty = parse_update_status(self.status)
+		self.price = order_request_responsoe[2][16]
+		self.price_avg = order_request_responsoe[2][17]
+		self.price_trailing = order_request_responsoe[2][18]
+		self.price_aux_limit = order_request_responsoe[2][19]
+		self.notify = order_request_responsoe[2][23]
+		self.hidden = order_request_responsoe[2][24]
+		self.placed_id = order_request_responsoe[2][25]
+		self.routing = order_request_responsoe[2][28]
 
 class OrderStreamParser(object):
 	def __init__(self, order_request_responsoe):
@@ -59,7 +104,7 @@ class OrderStreamParser(object):
 		self.mts_tif = order_request_responsoe[2][0][10]
 		self.flags = order_request_responsoe[2][0][12]
 		self.status = order_request_responsoe[2][0][13]
-		self.status_dictionaty = self.parse_update_status(self.status)
+		self.status_dictionaty = parse_update_status(self.status)
 		self.price = order_request_responsoe[2][0][16]
 		self.price_avg = order_request_responsoe[2][0][17]
 		self.price_aux_limit = order_request_responsoe[2][0][18]
@@ -67,24 +112,6 @@ class OrderStreamParser(object):
 		self.hidden = order_request_responsoe[2][0][23]
 		self.placed_id = order_request_responsoe[2][0][24]
 		self.routing = order_request_responsoe[2][0][27]
-
-	def parse_update_status(self, order_status_string):
-		def parse_splitted_order_status(order_status):
-			splitted_order_status = order_status.replace(' ', '').split('@')
-			executed_amount = float(splitted_order_status[1].split('(')[1].split(')')[0])
-			executed_price = float(splitted_order_status[1].split('(')[0])
-			order_status_status = splitted_order_status[0]
-			return executed_amount, executed_price, order_status_status
-		if 'was' in order_status_string:
-			order_error, splitted_order_status = order_status_string.replace(' ', '').split('was:')
-			executed_amount, executed_price, order_status_status = parse_splitted_order_status(splitted_order_status)
-			return {'order_error':order_error, 'executed_amount':executed_amount, 'executed_price':executed_price, 'order_status_status':order_status_status}
-		elif '@' in order_status_string:
-			executed_amount, executed_price, order_status_status = parse_splitted_order_status(order_status_string)
-			return {'executed_amount':executed_amount, 'executed_price':executed_price, 'order_status_status':order_status_status}
-		else:
-			splitted_order_status = order_status_string.replace(' ', '')
-			return {'order_status_status':splitted_order_status}
 
 class TradeUpdateParser(object):
 	def __init__(self, order_request_responsoe):
@@ -126,14 +153,19 @@ class OrderRequestParser(object):
 		self.type = order_request_responsoe[2][4][8]
 		self.is_active = order_request_responsoe[2][4][13]
 		self.price = order_request_responsoe[2][4][16]
-		self.is_successful = order_request_responsoe[2][6]
+		self.mts_update = order_request_responsoe[2][5]
+		self.is_successful = order_request_responsoe[2
+		self.mts_update = order_request_responsoe[2][5]
 		self.message = order_request_responsoe[2][7]
 
 class OrderConfirmationParser(object):
 	def __init__(self, order_confirmation_responsoe):
-		self.request_string = order_confirmation_responsoe[1]
-		self.order_id = order_confirmation_responsoe[2][0]
-		self.order_cid = order_confirmation_responsoe[2][2]
+		self.request_string = order_confirmation_respo
+		self.mts_update = order_request_responsoe[2][5]
+		self.order_id = order_confirmation_responsoe[2
+		self.mts_update = order_request_responsoe[2][5]
+		self.order_cid = order_confirmation_responsoe[
+		self.mts_update = order_request_responsoe[2][5]
 		self.symbol = order_confirmation_responsoe[2][3]
 		self.amount = order_confirmation_responsoe[2][6]
 		self.type = order_confirmation_responsoe[2][8]
@@ -158,11 +190,23 @@ class ResponseObjectFactory(object):
 					return AuthenticationParser(resp)
 		elif type(resp) is list:
 			if 'on' in resp:
-				return OrderConfirmationParser(resp)
+				is_active = resp[2][13]
+				if is_active == 'ACTIVE':
+					return OrderConfirmationParser(resp)
+				else:
+					raise Exception('New order non active status!')
 			elif 'oc' in resp:
-				return OrderConfirmationParser(resp)
+				is_active = resp[2][13]
+				if is_active == 'CANCELED':
+					return OrderConfirmationParser(resp)
+				else:
+					return OrderStreamUpdateParser(resp)
 			elif 'ou' in resp:
-				return OrderConfirmationParser(resp)
+				is_active = resp[2][13]
+				if is_active == 'ACTIVE':
+					return OrderConfirmationParser(resp)
+				else:
+					return OrderStreamUpdateParser(resp)
 			elif 'n' in resp:
 				return OrderRequestParser(resp)
 			elif 'te' in resp:
@@ -203,15 +247,8 @@ class BitfinexWebSocketClient(threading.Thread):
 		self.trade_event_stack = []
 		self.trade_update_stack = []
 		self.order_stream_stack = []
-
-	def print_stack_stats(self):
-		print('order_confirmation_stack length: {0}'.format(len(self.order_confirmation_stack)))
-		print('order_request_stack length: {0}'.format(len(self.order_request_stack)))
-		print('authentication_stack length: {0}'.format(len(self.authentication_stack)))
-		print('approved_order_confirmation_stack length: {0}'.format(len(self.approved_order_confirmation_stack)))
-		print('trade_event_stack length: {0}'.format(len(self.trade_event_stack)))
-		print('trade_update_stack length: {0}'.format(len(self.trade_update_stack)))
-		print('order_stream_stack length: {0}'.format(len(self.order_stream_stack)))
+		self.order_stream_update_stack = []
+		self.active_orders = {}
 
 	def get_auth_payload(self):
 		nonce = int(time.time() * self.nonce_factor)
@@ -246,6 +283,7 @@ class BitfinexWebSocketClient(threading.Thread):
 		new_order_query = self.prepare_new_order_req(self.cid_generator.get_next_cid(), symbol, amount, price)
 		request_confirmation_success, order_confirmation = self.verify_order_response(new_order_query)
 		self.approved_order_confirmation_stack[order_confirmation.order_id] = order_confirmation
+		self.active_orders[order_confirmation.order_id] = OrderRepresentation(order_confirmation)
 		return request_confirmation_success
 
 	def update_order(self, ord_id, amount, price):
@@ -259,14 +297,29 @@ class BitfinexWebSocketClient(threading.Thread):
 		request_confirmation_success, order_confirmation = self.verify_order_response(json.dumps(cancle_order_query))
 		self.approved_order_confirmation_stack.pop(order_confirmation.order_id)
 		return request_confirmation_success
-	
-	def process_trade(self, trade_update_resp):
-		for k in self.approved_order_confirmation_stack.keys():
-			if trade_update_resp.order_id == k:
-				self.approved_order_confirmation_stack.pop(k)
 
-	def process_order_stream(self, order_stream_resp):
-		pass
+{'chanle_id': 0,
+ 'event_string': 'tu',
+ 'exec_amount': 0.00078577,
+ 'exec_price': 1.5622,
+ 'fee': -2.468276e-06,
+ 'fee_currnecy': 'USD',
+ 'maker': -1,
+ 'order_id': 28272039583,
+ 'order_price': 1.5699,
+ 'orderer_type': 'LIMIT',
+ 'symbol': 'tETPUSD',
+ 'time_stamp': 1563019729400,
+ 'trade_id': 377400231}
+
+	def process_order_update(self, resp_factory_object):
+		if type(resp_factory_object) is TradeUpdateParser:
+			if resp_factory_object.order_id in self.active_orders.keys():
+				self.self.active_orders[resp_factory_object.order_id]
+			else:
+				raise Exception('Processed order is not in active orders list.')
+		elif type(resp_factory_object) is OrderStreamUpdateParser:
+			pass
 
 	def run(self):
 		while True:
@@ -286,6 +339,17 @@ class BitfinexWebSocketClient(threading.Thread):
 					self.trade_update_stack.append(resp_factory_object)
 				elif type(resp_factory_object) is OrderStreamParser:
 					self.order_stream_stack.append(resp_factory_object)
+				elif type(resp_factory_object) is OrderStreamUpdateParser:
+					self.order_stream_update_stack.append(resp_factory_object)	
+
+	def print_stack_stats(self):
+		print('order_confirmation_stack length: {0}'.format(len(self.order_confirmation_stack)))
+		print('order_request_stack length: {0}'.format(len(self.order_request_stack)))
+		print('authentication_stack length: {0}'.format(len(self.authentication_stack)))
+		print('approved_order_confirmation_stack length: {0}'.format(len(self.approved_order_confirmation_stack)))
+		print('trade_event_stack length: {0}'.format(len(self.trade_event_stack)))
+		print('trade_update_stack length: {0}'.format(len(self.trade_update_stack)))
+		print('order_stream_stack length: {0}'.format(len(self.order_stream_stack)))
 
 def main():
 	bwsc = BitfinexWebSocketClient(BITFINEX_KEY, BITFINEX_SECRET, NONCE_FACTOR, BITFINEX_API_URL)
