@@ -144,33 +144,28 @@ class TradeEventParser(object):
 		self.maker = order_request_responsoe[2][8]
 
 class OrderRequestParser(object):
-	def __init__(self, order_request_responsoe):
-		self.request_string = order_request_responsoe[2][1]
-		self.order_id = order_request_responsoe[2][4][0]
-		self.order_cid = order_request_responsoe[2][4][2]
-		self.symbol = order_request_responsoe[2][4][3]
-		self.amount = order_request_responsoe[2][4][6]
-		self.type = order_request_responsoe[2][4][8]
-		self.is_active = order_request_responsoe[2][4][13]
-		self.price = order_request_responsoe[2][4][16]
-		self.mts_update = order_request_responsoe[2][5]
-		self.is_successful = order_request_responsoe[2][6]
-		self.mts_update = order_request_responsoe[2][5]
-		self.message = order_request_responsoe[2][7]
+    def __init__(self, order_request_responsoe):
+        self.request_string = order_request_responsoe[2][1]
+        self.order_id = order_request_responsoe[2][4][0]
+        self.order_cid = order_request_responsoe[2][4][2]
+        self.symbol = order_request_responsoe[2][4][3]
+        self.amount = order_request_responsoe[2][4][6]
+        self.type = order_request_responsoe[2][4][8]
+        self.is_active = order_request_responsoe[2][4][13]
+        self.price = order_request_responsoe[2][4][16]
+        self.is_successful = order_request_responsoe[2][6]
+        self.message = order_request_responsoe[2][7]
 
 class OrderConfirmationParser(object):
-	def __init__(self, order_confirmation_responsoe):
-		self.request_string = order_confirmation_respo
-		self.mts_update = order_request_responsoe[2][5]
-		self.order_id = order_confirmation_responsoe[2
-		self.mts_update = order_request_responsoe[2][5]
-		self.order_cid = order_confirmation_responsoe[
-		self.mts_update = order_request_responsoe[2][5]
-		self.symbol = order_confirmation_responsoe[2][3]
-		self.amount = order_confirmation_responsoe[2][6]
-		self.type = order_confirmation_responsoe[2][8]
-		self.is_active = order_confirmation_responsoe[2][13]
-		self.price = order_confirmation_responsoe[2][16]
+    def __init__(self, order_confirmation_responsoe):
+        self.request_string = order_confirmation_responsoe[1]
+        self.order_id = order_confirmation_responsoe[2][0]
+        self.order_cid = order_confirmation_responsoe[2][2]
+        self.symbol = order_confirmation_responsoe[2][3]
+        self.amount = order_confirmation_responsoe[2][6]
+        self.type = order_confirmation_responsoe[2][8]
+        self.is_active = order_confirmation_responsoe[2][13]
+        self.price = order_confirmation_responsoe[2][16]
 
 class AuthenticationParser(object):
 	def __init__(self, auth_response):
@@ -298,46 +293,17 @@ class BitfinexWebSocketClient(threading.Thread):
 		self.approved_order_confirmation_stack.pop(order_confirmation.order_id)
 		return request_confirmation_success
 
-{'chanle_id': 0,
- 'event_string': 'tu',
- 'exec_amount': 0.00078577,
- 'exec_price': 1.5622,
- 'fee': -2.468276e-06,
- 'fee_currnecy': 'USD',
- 'maker': -1,
- 'order_id': 28272039583,
- 'order_price': 1.5699,
- 'orderer_type': 'LIMIT',
- 'symbol': 'tETPUSD',
- 'time_stamp': 1563019729400,
- 'trade_id': 377400231}
-
-self.order_id = order_confirmation.order_id
-self.order_cid = order_confirmation.order_cid
-self.symbol = order_confirmation.symbol
-self.amount = order_confirmation.amount
-self.price = order_confirmation.price
-self.order_type = order_confirmation.order_type
-self.is_active = order_confirmation.is_active
-self.chanle_id = None
-self.exec_amount = 0
-self.exec_price = 0
-self.fee = 0
-self.fee_currnecy = None
-self.maker = None
-
-
 	def process_order_update(self, resp_factory_object):
 		if type(resp_factory_object) is TradeUpdateParser:
 			if resp_factory_object.order_id in self.active_orders.keys():
-				self.self.active_orders[resp_factory_object.order_id].chanle_id = resp_factory_object.chanle_id
-				e_p = self.self.active_orders[resp_factory_object.order_id].exec_price
-				e_a = self.self.active_orders[resp_factory_object.order_id].exec_amount
-				self.self.active_orders[resp_factory_object.order_id].exec_amount += resp_factory_object.exec_amount
-				self.self.active_orders[resp_factory_object.order_id].exec_price = (e_p*e_a + resp_factory_object.exec_amount * resp_factory_object.exec_price)/(e_a + resp_factory_object.exec_amount)
-				self.self.active_orders[resp_factory_object.order_id].fee += resp_factory_object.fee
-				self.self.active_orders[resp_factory_object.order_id].fee_currnecy = resp_factory_object.fee_currnecy
-				self.self.active_orders[resp_factory_object.order_id].maker += [resp_factory_object.maker]
+				self.active_orders[resp_factory_object.order_id].chanle_id = resp_factory_object.chanle_id
+				e_p = self.active_orders[resp_factory_object.order_id].exec_price
+				e_a = self.active_orders[resp_factory_object.order_id].exec_amount
+				self.active_orders[resp_factory_object.order_id].exec_amount += resp_factory_object.exec_amount
+				self.active_orders[resp_factory_object.order_id].exec_price = (e_p*e_a + resp_factory_object.exec_amount * resp_factory_object.exec_price)/(e_a + resp_factory_object.exec_amount)
+				self.active_orders[resp_factory_object.order_id].fee += resp_factory_object.fee
+				self.active_orders[resp_factory_object.order_id].fee_currnecy = resp_factory_object.fee_currnecy
+				self.active_orders[resp_factory_object.order_id].maker += [resp_factory_object.maker]
 			else:
 				raise Exception('Processed order is not in active orders list.')
 		elif type(resp_factory_object) is OrderStreamUpdateParser:
