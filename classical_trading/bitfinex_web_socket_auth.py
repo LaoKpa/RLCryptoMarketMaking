@@ -95,6 +95,9 @@ class BitfinexWebSocketClient(threading.Thread):
 		self.order_stream_update_stack = []
 		self.active_orders = {}
 
+	def get_order_representation(self, order_id):
+		return self.active_orders[order_id]
+
 	def get_auth_payload(self):
 		nonce = int(time.time() * self.nonce_factor)
 		auth_payload = 'AUTH{}'.format(nonce)
@@ -129,12 +132,13 @@ class BitfinexWebSocketClient(threading.Thread):
 		request_confirmation_success, order_confirmation = self.verify_order_response(new_order_query)
 		self.approved_order_confirmation_stack[order_confirmation.order_id] = order_confirmation
 		self.active_orders[order_confirmation.order_id] = OrderRepresentation(order_confirmation)
-		return request_confirmation_success
+		return request_confirmation_success, order_confirmation.order_id
 
 	def update_order(self, ord_id, amount, price):
 		update_order_query = [0, 'ou', None, {'id': ord_id, 'amount': str(amount), 'price': str(price)}]
 		request_confirmation_success, order_confirmation = self.verify_order_response(json.dumps(update_order_query))
 		self.approved_order_confirmation_stack[order_confirmation.order_id] = order_confirmation
+		self.active_orders[order_confirmation.order_id].update_order_confirmation(order_confirmation)
 		return request_confirmation_success
 
 	def cancle_order(self, ord_id):
@@ -181,7 +185,10 @@ class BitfinexWebSocketClient(threading.Thread):
 					self.order_stream_update_stack.append(resp_factory_object)
 				self.process_order_update(resp_factory_object)
 
-def main():
+def get_authenticated_client():
 	bwsc = BitfinexWebSocketClient(BITFINEX_KEY, BITFINEX_SECRET, NONCE_FACTOR, BITFINEX_API_URL)
 	bwsc.start()
-	return bwsc
+	if bwsc.authenticate():
+		return bwsc
+	else:
+		raise Exception('Bitfinex Web Socket Client Authenticatoin Error.')
