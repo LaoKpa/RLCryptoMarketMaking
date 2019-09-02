@@ -21,12 +21,12 @@ class BasicMarketMakingStrategy(object):
         self.order_book.start()
         self.bitfinex_websocket_client = bwsa.get_authenticated_client()
         self.req_profit = req_profit
-        self.symbol = symbol
+        self.symbol = symbol 
         self.low_case_symbol = self.symbol[1:].lower()
         self.order_id_dictionary = {}
         self.amount = amount
         if not self.order_book.wsob.is_book_initialized:
-            raise Exception('Order book did not initialized correctly.')
+            raise Exception('Order book did not initialized correctly.') 
 
     def initiate_order(self, amount, side):
         current_price_dict = self.get_current_price_dict()
@@ -53,19 +53,29 @@ class BasicMarketMakingStrategy(object):
         precedenes = generic_find(current_book_dict[side], lambda item: item[0] == order_representation.price)
         return precedenes, current_book_dict[side][precedenes][1]
 
-    def update_order(self, side, order_id, amount):
+    def update_order(self, side, order_id, amount, price):
+            if not self.bitfinex_websocket_client.update_order(order_id, amount, price):
+                raise Exception('Unsuccessful order update.')
+
+    def get_current_price(self, side):
         precedenes, count = self.get_order_book_precedenes(side)
         if not (precedenes == 0 and count == 1):
+        else:
             current_price_dict = self.get_current_price_dict()
-            updated_price = current_price_dict[side] + ONE_PRECISION_POINT * SIDE_PRICE_DIFF_DICT[side]
-            if not self.bitfinex_websocket_client.update_order(order_id, amount, updated_price):
-                raise Exception('Unsuccessful order update.')
+            price = current_price_dict[side]
 
     def start_strategy_routine(self, amount):
         order_id_ask = self.initiate_order(amount, 'ask')
         order_id_bid = self.initiate_order(amount, 'bid')
         while True:
-            precedenes_bid, count_bid = self.get_order_book_precedenes('bid')
+            p_a_h
+            p_a_e
+            p_b_e
+            a_e_a
+            a_e_b
+            s_t
+            r_t
+
 
 class BasicMarketMakingPricingModel(object):
     def __init__(self, epsilon, trade_amount):
