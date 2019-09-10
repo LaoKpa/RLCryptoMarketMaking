@@ -1,6 +1,8 @@
 
 import time as tm
 
+import tabulate as tb
+
 import bitfinex as bt
 import highest_spread_symbols as hss
 import bitfinex_order_book_construction as bobc
@@ -13,24 +15,26 @@ def generic_find(l, lam):
     for i in range(len(l)):
         if lam(l[i]):
             return i
+    return -1
 
 class BasicMarketMakingStrategy(object):
-    def __init__(self, symbol, req_profit, amount):
-        self.pricing_model = BasicMarketMakingPricingModel(ONE_PRECISION_POINT, amount)
+    def __init__(self, symbol, req_spread_percntage, dollar_amount):
         self.order_book = bobc.OrderBookThread(symbol)
         self.order_book.start()
         self.bitfinex_websocket_client = bwsa.get_authenticated_client()
-        self.req_profit = req_profit
+        self.req_spread_percntage = req_spread_percntage
         self.symbol = symbol 
         self.low_case_symbol = self.symbol[1:].lower()
         self.order_id_dictionary = {}
-        self.amount = amount
+        self.dollar_amount = dollar_amount
         if not self.order_book.wsob.is_book_initialized:
             raise Exception('Order book did not initialized correctly.') 
 
     def initiate_order(self, amount, side):
         current_price_dict = self.get_current_price_dict()
         alteration =  ONE_PRECISION_POINT * SIDE_PRICE_DIFF_DICT[side]
+        amount = SIDE_PRICE_DIFF_DICT[side] * amount
+        print('order: {0}, {1}, {2}, {3}'.format(side, current_price_dict[side], alteration, amount))
         is_successful, order_id = self.bitfinex_websocket_client.place_new_order(self.symbol, amount, current_price_dict[side] + alteration)
         if is_successful:
             self.order_id_dictionary[side] = order_id
@@ -51,31 +55,55 @@ class BasicMarketMakingStrategy(object):
         else:
             raise Exception('No order matches order side.')
         precedenes = generic_find(current_book_dict[side], lambda item: item[0] == order_representation.price)
-        return precedenes, current_book_dict[side][precedenes][1]
+        if precedenes >= 0:
+            return precedenes, current_book_dict[side][precedenes][1]
+        else:
+            return precedenes, 0
 
-    def update_order(self, side, order_id, amount, price):
-            if not self.bitfinex_websocket_client.update_order(order_id, amount, price):
-                raise Exception('Unsuccessful order update.')
+    def update_order(self, order_id, amount, price, side):
+        amount = SIDE_PRICE_DIFF_DICT[side] * amount
+        if not self.bitfinex_websocket_client.update_order(order_id, amount, price):
+            raise Exception('Unsuccessful order update.')
 
     def get_current_price(self, side):
+        price_index = 0
+        first_in_line_precedence = 0
+        second_in_line_precedence = 1
         precedenes, count = self.get_order_book_precedenes(side)
-        if not (precedenes == 0 and count == 1):
+        current_book_dict = self.get_current_book_dict()
+        current_book_dict = current_book_dict[side]
+        if precedenes == 0 and count == 1:
+            return current_book_dict[second_in_line_precedence][price_index]
         else:
-            current_price_dict = self.get_current_price_dict()
-            price = current_price_dict[side]
+            return current_book_dict[first_in_line_precedence][price_index]
 
-    def start_strategy_routine(self, amount):
+    def start_strategy_routine(self):
+        price_dict = self.get_current_price_dict()
+        price = (price_dict['ask'] + price_dict['bid']) / 2
+        amount = self.dollar_amount / price
         order_id_ask = self.initiate_order(amount, 'ask')
         order_id_bid = self.initiate_order(amount, 'bid')
+        s_t = self.req_spread_percntage * price
+        r_t = s_t * amount
+        self.pricing_model = BasicMarketMakingPricingModel(ONE_PRECISION_POINT, amount)
         while True:
-            p_a_h
-            p_a_e
-            p_b_e
-            a_e_a
-            a_e_b
-            s_t
-            r_t
-
+            tm.sleep(0.1)
+            p_a_h = self.get_current_price('ask')
+            p_b_h = self.get_current_price('bid')
+            p_a_e = self.bitfinex_websocket_client.active_orders[order_id_ask].exec_price
+            p_b_e = self.bitfinex_websocket_client.active_orders[order_id_bid].exec_price
+            a_e_a = self.bitfinex_websocket_client.active_orders[order_id_ask].exec_amount
+            a_e_b = self.bitfinex_websocket_client.active_orders[order_id_bid].exec_amount
+            print(tb.tabulate([['p_a_h', p_a_h],['p_b_h', p_b_h],['p_a_e', p_a_e],['p_b_e', p_b_e],['a_e_a', a_e_a],['a_e_b', a_e_b]]))
+            order_update_dict = self.pricing_model.get_updated_order_prices(s_t, r_t, p_a_h, p_b_h, p_a_e, p_b_e, a_e_a, a_e_b)
+            ask_order_finished = self.bitfinex_websocket_client.active_orders[order_id_ask].amount == 0
+            bid_order_finished = self.bitfinex_websocket_client.active_orders[order_id_bid].amount == 0
+            if not ask_order_finished:
+                self.update_order(order_id_ask, order_update_dict['ask']['amount'], order_update_dict['ask']['price'], 'ask')
+            if not bid_order_finished:
+                self.update_order(order_id_bid, order_update_dict['bid']['amount'], order_update_dict['bid']['price'], 'bid')
+            if ask_order_finished and bid_order_finished:
+                return True
 
 class BasicMarketMakingPricingModel(object):
     def __init__(self, epsilon, trade_amount):
@@ -86,7 +114,7 @@ class BasicMarketMakingPricingModel(object):
         a_l_a = self.trade_amount - a_e_a
         a_l_b = self.trade_amount - a_e_b
         #1
-        if abs(p_a_h-p_b_h) >= s_t and a_e_a == 0 and a_e_b == 0:
+        if abs(p_a_h - p_b_h) >= s_t and a_e_a == 0 and a_e_b == 0:
             p_a = p_a_h - self.epsilon
             p_b = p_b_h + self.epsilon
             return {'ask':{'price':p_a, 'amount':a_l_a}, 'bid':{'price':p_b, 'amount':a_l_b}}

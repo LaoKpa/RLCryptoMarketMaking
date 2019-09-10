@@ -27,26 +27,27 @@ def parse_update_status(order_status_string):
 		return {'order_status_status':splitted_order_status}
 
 class OrderRepresentation(object):
-	def __init__(self, order_confirmation):
-		self.order_id = order_confirmation.order_id
-		self.order_cid = order_confirmation.order_cid
-		self.symbol = order_confirmation.symbol
-		self.amount = order_confirmation.amount
-		self.price = order_confirmation.price
-		self.order_type = order_confirmation.order_type
-		self.is_active = [order_confirmation.is_active]
-		self.chanle_id = 0
-		self.exec_amount = 0
-		self.exec_price = 0
-		self.fee = 0
-		self.fee_currnecy = ''
-		self.maker = []
+	def __init__(self, order_confirmation=None):
+		if order_confirmation:
+			self.order_id = order_confirmation.order_id
+			self.order_cid = order_confirmation.order_cid
+			self.symbol = order_confirmation.symbol
+			self.amount = order_confirmation.amount
+			self.price = order_confirmation.price
+			self.order_type = order_confirmation.type
+			self.is_active = [order_confirmation.is_active]
+			self.chanle_id = 0
+			self.exec_amount = 0
+			self.exec_price = 0
+			self.fee = 0
+			self.fee_currnecy = ''
+			self.maker = []
 
 	def update_order_confirmation(self, order_confirmation):
 		self.symbol = order_confirmation.symbol
 		self.amount = order_confirmation.amount
 		self.price = order_confirmation.price
-		self.order_type = order_confirmation.order_type
+		self.order_type = order_confirmation.type
 
 class OrderStreamUpdateParser(object):
 	def __init__(self, order_request_responsoe):
