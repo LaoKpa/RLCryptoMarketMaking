@@ -95,7 +95,7 @@ class BasicMarketMakingStrategy(object):
             a_e_a = self.bitfinex_websocket_client.active_orders[order_id_ask].exec_amount
             a_e_b = self.bitfinex_websocket_client.active_orders[order_id_bid].exec_amount
             print(tb.tabulate([['p_a_h', p_a_h],['p_b_h', p_b_h],['p_a_e', p_a_e],['p_b_e', p_b_e],['a_e_a', a_e_a],['a_e_b', a_e_b]]))
-            order_update_dict = self.pricing_model.get_updated_order_prices(s_t, r_t, p_a_h, p_b_h, p_a_e, p_b_e, a_e_a, a_e_b)
+            order_update_dict = self.pricing_model.get_updated_order_prices(s_t, r_t, p_a_h, p_b_h, p_a_e, p_b_e, abs(a_e_a), abs(a_e_b))
             ask_order_finished = self.bitfinex_websocket_client.active_orders[order_id_ask].amount == 0
             bid_order_finished = self.bitfinex_websocket_client.active_orders[order_id_bid].amount == 0
             if not ask_order_finished:
@@ -235,3 +235,5 @@ class BasicMarketMakingPricingModel(object):
             #8.C 
             if a_e_a == a_e_b:
                 return {'ask':{'price':0, 'amount':0}, 'bid':{'price':0, 'amount':0}}
+        print('duck112')
+        import pdb; pdb.set_trace()

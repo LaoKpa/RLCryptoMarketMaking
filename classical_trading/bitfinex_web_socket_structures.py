@@ -15,16 +15,24 @@ def parse_update_status(order_status_string):
 		executed_price = float(splitted_order_status[1].split('(')[0])
 		order_status_status = splitted_order_status[0]
 		return executed_amount, executed_price, order_status_status
-	if 'was' in order_status_string:
-		order_error, splitted_order_status = order_status_string.replace(' ', '').split('was:')
-		executed_amount, executed_price, order_status_status = parse_splitted_order_status(splitted_order_status)
-		return {'order_error':order_error, 'executed_amount':executed_amount, 'executed_price':executed_price, 'order_status_status':order_status_status}
-	elif '@' in order_status_string:
-		executed_amount, executed_price, order_status_status = parse_splitted_order_status(order_status_string)
-		return {'executed_amount':executed_amount, 'executed_price':executed_price, 'order_status_status':order_status_status}
-	else:
-		splitted_order_status = order_status_string.replace(' ', '')
-		return {'order_status_status':splitted_order_status}
+	try:
+		if '(note:POSCLOSE)' in order_status_string:
+			splitted_order_status, _ = order_status_string.replace(' ', '').split(':')
+			executed_amount, executed_price, order_status_status = parse_splitted_order_status(splitted_order_status)
+			return {'executed_amount':executed_amount, 'executed_price':executed_price, 'order_status_status':order_status_status}
+		if 'was' in order_status_string:
+			order_error, splitted_order_status = order_status_string.replace(' ', '').split('was:')
+			executed_amount, executed_price, order_status_status = parse_splitted_order_status(splitted_order_status)
+			return {'order_error':order_error, 'executed_amount':executed_amount, 'executed_price':executed_price, 'order_status_status':order_status_status}
+		elif '@' in order_status_string:
+			executed_amount, executed_price, order_status_status = parse_splitted_order_status(order_status_string)
+			return {'executed_amount':executed_amount, 'executed_price':executed_price, 'order_status_status':order_status_status}
+		else:
+			splitted_order_status = order_status_string.replace(' ', '')
+			return {'order_status_status':splitted_order_status}
+	except Exception as e:
+		import pdb; pdb.set_trace()
+		print(e)
 
 class OrderRepresentation(object):
 	def __init__(self, order_confirmation=None):
@@ -137,16 +145,24 @@ class TradeEventParser(object):
 
 class OrderRequestParser(object):
 	def __init__(self, order_request_responsoe):
-		self.request_string = order_request_responsoe[2][1]
-		self.order_id = order_request_responsoe[2][4][0]
-		self.order_cid = order_request_responsoe[2][4][2]
-		self.symbol = order_request_responsoe[2][4][3]
-		self.amount = order_request_responsoe[2][4][6]
-		self.type = order_request_responsoe[2][4][8]
-		self.is_active = order_request_responsoe[2][4][13]
-		self.price = order_request_responsoe[2][4][16]
-		self.is_successful = order_request_responsoe[2][6]
-		self.message = order_request_responsoe[2][7]
+		try:
+			self.request_string = order_request_responsoe[2][1]
+			if order_request_responsoe[2][4]:
+				self.order_id = order_request_responsoe[2][4][0]
+				self.order_cid = order_request_responsoe[2][4][2]
+				self.symbol = order_request_responsoe[2][4][3]
+				self.amount = order_request_responsoe[2][4][6]
+				self.type = order_request_responsoe[2][4][8]
+				self.is_active = order_request_responsoe[2][4][13]
+				self.price = order_request_responsoe[2][4][16]
+			else:
+				self.order_id = 0
+				self.order_cid = 0
+			self.is_successful = order_request_responsoe[2][6]
+			self.message = order_request_responsoe[2][7]
+		except Exception as e:
+			import pdb; pdb.set_trace()
+			print('OrderRequestParser')
 
 class OrderConfirmationParser(object):
 	def __init__(self, order_confirmation_responsoe):

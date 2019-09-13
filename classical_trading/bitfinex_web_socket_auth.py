@@ -174,10 +174,14 @@ class BitfinexWebSocketClient(threading.Thread):
 			global GLOBAL_VERIFICATION_LOCK
 			GLOBAL_VERIFICATION_LOCK = True
 			try:
-				if self.active_orders[ord_id].is_active[-1]['order_status_status'] == 'EXECUTED':
+				if self.active_orders[ord_id].is_active[-1]['order_status_status'] in ['EXECUTED', 'PARTIALLYFILLED']:
 					return True
+				else:
+					import pdb; pdb.set_trace()
+					print('duck')
 			except Exception as e:
 				print(e)
+				import pdb; pdb.set_trace()
 				return False
 
 	def cancle_order(self, ord_id):
