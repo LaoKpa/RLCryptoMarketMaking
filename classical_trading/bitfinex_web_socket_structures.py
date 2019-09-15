@@ -17,7 +17,10 @@ def parse_update_status(order_status_string):
 		return executed_amount, executed_price, order_status_status
 	try:
 		if '(note:POSCLOSE)' in order_status_string:
-			splitted_order_status, _ = order_status_string.replace(' ', '').split(':')
+			if len([ i for i in order_status_string if i == ':']) == 1:
+				splitted_order_status, _ = order_status_string.replace(' ', '').split(':')
+			else:
+				splitted_order_status, _, _ = order_status_string.replace(' ', '').split(':')
 			executed_amount, executed_price, order_status_status = parse_splitted_order_status(splitted_order_status)
 			return {'executed_amount':executed_amount, 'executed_price':executed_price, 'order_status_status':order_status_status}
 		if 'was' in order_status_string:

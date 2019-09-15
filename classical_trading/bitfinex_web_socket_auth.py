@@ -21,11 +21,13 @@ BITFINEX_HEART_BEAT = '[0,"hb"]'
 GLOBAL_VERIFICATION_LOCK = True
 
 def verify_response(resp_stack, lam):
-	while GLOBAL_VERIFICATION_LOCK:
+	while True:
 		for q in resp_stack:
 			if lam(q):
 				resp_stack.remove(q)
 				return (True, q)
+		if not GLOBAL_VERIFICATION_LOCK:
+			break
 	return False, None
 
 class ResponseObjectFactory(object):

@@ -34,7 +34,6 @@ class BasicMarketMakingStrategy(object):
         current_price_dict = self.get_current_price_dict()
         alteration =  ONE_PRECISION_POINT * SIDE_PRICE_DIFF_DICT[side]
         amount = SIDE_PRICE_DIFF_DICT[side] * amount
-        print('order: {0}, {1}, {2}, {3}'.format(side, current_price_dict[side], alteration, amount))
         is_successful, order_id = self.bitfinex_websocket_client.place_new_order(self.symbol, amount, current_price_dict[side] + alteration)
         if is_successful:
             self.order_id_dictionary[side] = order_id
@@ -96,6 +95,7 @@ class BasicMarketMakingStrategy(object):
             a_e_b = self.bitfinex_websocket_client.active_orders[order_id_bid].exec_amount
             print(tb.tabulate([['p_a_h', p_a_h],['p_b_h', p_b_h],['p_a_e', p_a_e],['p_b_e', p_b_e],['a_e_a', a_e_a],['a_e_b', a_e_b]]))
             order_update_dict = self.pricing_model.get_updated_order_prices(s_t, r_t, p_a_h, p_b_h, p_a_e, p_b_e, abs(a_e_a), abs(a_e_b))
+            print(order_update_dict)
             ask_order_finished = self.bitfinex_websocket_client.active_orders[order_id_ask].amount == 0
             bid_order_finished = self.bitfinex_websocket_client.active_orders[order_id_bid].amount == 0
             if not ask_order_finished:
@@ -115,11 +115,13 @@ class BasicMarketMakingPricingModel(object):
         a_l_b = self.trade_amount - a_e_b
         #1
         if abs(p_a_h - p_b_h) >= s_t and a_e_a == 0 and a_e_b == 0:
+            print('Pricing Model: #1')
             p_a = p_a_h - self.epsilon
             p_b = p_b_h + self.epsilon
             return {'ask':{'price':p_a, 'amount':a_l_a}, 'bid':{'price':p_b, 'amount':a_l_b}}
         #2.A
         if abs(p_a_h-p_b_h) >= s_t and a_e_a > 0 and a_e_b == 0:
+            print('Pricing Model: #2.A')
             f = mu * (p_a_e * a_e_a + p_a_h * a_l_a + p_b_h * a_l_b)
             if r_t - p_a_e * a_e_a <= p_a_h * a_l_a - p_b_h * a_l_b - f:
                 p_a = p_a_h - self.epsilon
@@ -131,6 +133,7 @@ class BasicMarketMakingPricingModel(object):
                 return {'ask':{'price':p_a, 'amount':a_l_a}, 'bid':{'price':p_b, 'amount':a_l_b}}
         #2.B
         if abs(p_a_h-p_b_h) >= s_t and a_e_b > 0 and a_e_a == 0:
+            print('Pricing Model: #2.B')
             f = mu * (p_b_e * a_e_b + p_b_h * a_l_b + p_a_h * a_l_a)
             if r_t + p_b_e * a_e_b <= p_a_h * a_l_a - p_b_h * a_l_b - f:
                 p_a = p_a_h - self.epsilon
@@ -142,8 +145,10 @@ class BasicMarketMakingPricingModel(object):
                 return {'ask':{'price':p_a, 'amount':a_l_a}, 'bid':{'price':p_b, 'amount':a_l_b}}
         #3
         if abs(p_a_h-p_b_h) >= s_t and a_e_b > 0 and a_e_a > 0:
+            print('Pricing Model: #3')
             f = mu * (p_b_e * a_e_b + p_b_h * a_l_b + p_a_e * a_e_a + p_a_h * a_l_a)
             #3.A
+            print('Pricing Model: #3.A')
             if a_e_b >  a_e_a:
                 if r_t + p_b_e * a_e_b - p_a_e * a_e_a <= p_a_h * a_l_a - p_b_h * a_l_b - f:
                     p_a = p_a_h - self.epsilon
@@ -155,6 +160,7 @@ class BasicMarketMakingPricingModel(object):
                     return {'ask':{'price':p_a, 'amount':a_l_a}, 'bid':{'price':p_b, 'amount':a_l_b}}
             #3.B
             if a_e_a >  a_e_b:
+                print('Pricing Model: #3.B')
                 if r_t + p_b_e * a_e_b - p_a_e * a_e_a <= p_a_h * a_l_a - p_b_h * a_l_b - f:
                     p_a = p_a_h - self.epsilon
                     p_b = p_b_h + self.epsilon
@@ -165,6 +171,7 @@ class BasicMarketMakingPricingModel(object):
                     return {'ask':{'price':p_a, 'amount':a_l_a}, 'bid':{'price':p_b, 'amount':a_l_b}}
         #4.A
         if a_l_a == 0 and a_e_b == 0:
+            print('Pricing Model: #4.A')
             f = mu * (p_b_h * a_l_b + p_a_e * a_e_a)
             if r_t <= p_a_e * a_e_a - p_b_h * a_l_b - f:
                 p_a = 0
@@ -176,6 +183,7 @@ class BasicMarketMakingPricingModel(object):
                 return {'ask':{'price':p_a, 'amount':0}, 'bid':{'price':p_b, 'amount':a_l_b}}
         #4.B
         if a_l_b == 0 and a_e_a == 0:
+            print('Pricing Model: #4.B')
             f = mu * (p_b_e * a_e_b + p_a_h * a_l_a)
             if r_t <= p_a_h * a_l_a - p_b_e * a_e_b - f:
                 p_b = 0
@@ -187,6 +195,7 @@ class BasicMarketMakingPricingModel(object):
                 return {'ask':{'price':p_a, 'amount':a_l_a}, 'bid':{'price':p_b, 'amount':0}}
         #5.A
         if a_l_a == 0 and a_e_b > 0:
+            print('Pricing Model: #5.A')
             f = mu * (p_b_e * a_e_b + p_b_h * a_l_b + p_a_e * a_e_a)
             if r_t <= p_a_e * a_e_a - p_b_e * a_e_b - p_b_h * a_l_b - f:
                 p_b = p_b_h + self.epsilon
@@ -196,6 +205,7 @@ class BasicMarketMakingPricingModel(object):
                 return {'ask':{'price':0, 'amount':0}, 'bid':{'price':p_b, 'amount':a_l_b}}
         #5.B
         if a_l_b == 0 and a_e_a > 0:
+            print('Pricing Model: #5.B')
             f = mu * ( p_b_e * a_e_b + p_a_e * a_e_a + p_a_h * a_l_a)
             if r_t <= p_a_e * a_e_a + p_a_h * a_l_a - p_b_e * a_e_b - f:
                 p_a = p_a_h - self.epsilon
@@ -205,35 +215,43 @@ class BasicMarketMakingPricingModel(object):
                 return {'ask':{'price':p_a, 'amount':a_l_a}, 'bid':{'price':0, 'amount':0}}
         #6
         if abs(p_a_h-p_b_h) < s_t and a_e_a == 0 and a_e_b == 0:
+            print('Pricing Model: #6')
             f = mu * (p_b_h * a_l_b + p_a_h * a_l_a)
             p_a = (p_a_h + p_b_h + (r_t + f) / a_l_a) / 2
             p_b = (p_a_h + p_b_h - (r_t + f) / a_l_a) / 2
             return {'ask':{'price':p_a, 'amount':a_l_a}, 'bid':{'price':p_b, 'amount':a_l_b}}
         #7
         if abs(p_a_h-p_b_h) < s_t:
+            print('Pricing Model: #7')
             #7.A
             if a_e_a > 0 and a_e_b == 0:
+                print('Pricing Model: #7.A')
                 f = mu * (p_b_h * a_l_b + p_a_e * a_e_a + p_a_h * a_l_a)
                 p_b = (p_a_e * a_e_a - r_t - f) / a_e_a
                 return {'ask':{'price':0, 'amount':0}, 'bid':{'price':p_b, 'amount':a_e_a}}
             #7.B
             if a_e_b > 0 and a_e_a == 0:
+                print('Pricing Model: #7.B')
                 f = mu * (p_b_e * a_e_b + p_b_h * a_l_b + p_a_h * a_l_a)
                 p_a = (p_b_e * a_e_b + r_t + f) / a_e_b
                 return {'ask':{'price':p_a, 'amount':a_e_b}, 'bid':{'price':0, 'amount':0}}
         #8
         if abs(p_a_h-p_b_h) < s_t:
+            print('Pricing Model: #8')
             f = mu * (p_b_e * a_e_b + p_b_h * a_l_b + p_a_e * a_e_a + p_a_h * a_l_a)
             #8.A
             if a_e_b > a_e_a:
+                print('Pricing Model: #8.A')
                 p_a = (r_t + p_b_e * a_e_b - p_a_e * a_e_a + f)/(a_e_b - a_e_a)
                 return {'ask':{'price':p_a, 'amount':a_e_b - a_e_a}, 'bid':{'price':0, 'amount':0}}
             #8.B
             if a_e_a > a_e_b:
+                print('Pricing Model: #8.B')
                 p_b = (p_a_e * a_e_a - p_b_e * a_e_b - r_t - f)/(a_e_a - a_e_b)
                 return {'ask':{'price':0, 'amount':0}, 'bid':{'price':p_b, 'amount':a_e_a - a_e_b}}
-            #8.C 
+            #8.C
             if a_e_a == a_e_b:
+                print('Pricing Model: #8.C')
                 return {'ask':{'price':0, 'amount':0}, 'bid':{'price':0, 'amount':0}}
-        print('duck112')
         import pdb; pdb.set_trace()
+        print('placeholder')
