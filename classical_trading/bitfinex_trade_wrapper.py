@@ -1,6 +1,8 @@
 
 import time as tm
 
+import sys, os, importlib
+
 import bitfinex_trade_client as btc
 
 from termcolor import cprint
@@ -35,7 +37,7 @@ class BitfinexTradeWrapper(object):
             result = self.bitfinex_object.replace_order(order_id, symbol, str(amount), str(price), side, ordertype)
         except Exception as e:
             cprint('Exception Occured In {0} order: {1}. Type: {2}.'.\
-            format(order, e, type(e)), 'blue')
+            format(result, e, type(e)), 'blue')
             import pdb; pdb.set_trace()
             return [False, None]
         return [True, result]
@@ -45,7 +47,7 @@ class BitfinexTradeWrapper(object):
             result = self.bitfinex_object.place_order(str(amount), str(price), side, ordertype, symbol)
         except Exception as e:
             cprint('Exception Occured In {0} order: {1}. Type: {2}.'.\
-            format(order, e, type(e)), 'blue')
+            format(result, e, type(e)), 'blue')
             import pdb; pdb.set_trace()
             return [False, None]
         return [True, result]
