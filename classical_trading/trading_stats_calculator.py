@@ -2,6 +2,7 @@
 from time import *
 import bitfinex_trade_wrapper as btw
 
+SYMBOLS = ['ETPUSD', 'BTCUSD']
 
 def profit_from_past_trades(past_trades):
     buy_amount = sell_amount = fee_amount = 0
@@ -12,7 +13,7 @@ def profit_from_past_trades(past_trades):
             sell_amount += float(trade['price']) * float(trade['amount'])
         fee_amount += float(trade['fee_amount'])
     profit = sell_amount - buy_amount - fee_amount
-    return profit, buy_amount, sell_amount, fee_amount
+    return {'profit':profit, 'buy_volume':buy_amount, 'sell_volume':sell_amount, 'fee':fee_amount}
 
 def generate_timestamps():
     current_local_time = localtime()
@@ -36,9 +37,17 @@ def get_trades_from_timestamp(past_trades, timestamp):
     return reduced_past_trades
 
 def generate_all_stats():
+    profit_dictionary = {}
+    past_trades_dict = {}
     b = btw.BitfinexTradeWrapper(btw.BITFINEX_KEY, btw.BITFINEX_SECRET)
     timestamp_dictionary = generate_timestamps()
-
+    for symbol in SYMBOLS:
+        timestamp_profit_dictionary = {}
+        past_trades_dict[symbol] = b.bitfinex_object.past_trades(symbol)
+        for k,v in list(timestamp_dictionary.items()):
+            timestamp_profit_dictionary[k] = profit_from_past_trades(get_trades_from_timestamp(past_trades_dict[symbol], v))
+        profit_dictionary[symbol] = timestamp_profit_dictionary
+    return profit_dictionary
 
 def main():
     b = btw.BitfinexTradeWrapper(btw.BITFINEX_KEY, btw.BITFINEX_SECRET)
