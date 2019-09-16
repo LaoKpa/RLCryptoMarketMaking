@@ -12,6 +12,9 @@ from pprint import pprint
 
 from bitfinex_web_socket_structures import *
 
+import logging
+logging.basicConfig(filename='basic_market_making.log',level=logging.DEBUG)
+
 BITFINEX_KEY = 'N1bQYgTEzuDvzwYcpFXhiv1So0Df1IhoVj8wWQvczqT'
 BITFINEX_SECRET = 'L5LUl8e65GRsxMd28naxTL5dITticeD6mKTSloUDcG3'
 NONCE_FACTOR = 1000000
@@ -157,6 +160,7 @@ class BitfinexWebSocketClient(threading.Thread):
 		else:
 			global GLOBAL_VERIFICATION_LOCK
 			GLOBAL_VERIFICATION_LOCK = True
+			logging.debug('GVL True.')
 			order_representation = self.find_order_by_cid(self.cid_generator.current_cid)
 			if order_representation:
 				return True, order_representation.order_id
@@ -166,7 +170,9 @@ class BitfinexWebSocketClient(threading.Thread):
 		update_order_query = [0, 'ou', None, {'id': ord_id, 'amount': str(amount), 'price': str(price)}]
 		self.websocket_connection.send(json.dumps(update_order_query))
 		self.order_update_lock = True
+		logging.debug('Update order verify response start.')
 		request_confirmation_success, order_confirmation = self.verify_update_order_response(ord_id)
+		logging.debug('Update order verify response end.')
 		self.order_update_lock = False
 		if request_confirmation_success:
 			self.approved_order_confirmation_stack[order_confirmation.order_id] = order_confirmation
@@ -175,6 +181,7 @@ class BitfinexWebSocketClient(threading.Thread):
 		else:
 			global GLOBAL_VERIFICATION_LOCK
 			GLOBAL_VERIFICATION_LOCK = True
+			logging.debug('GVL True.')
 			try:
 				if self.active_orders[ord_id].is_active[-1]['order_status_status'] in ['EXECUTED', 'PARTIALLYFILLED']:
 					return True
@@ -213,6 +220,7 @@ class BitfinexWebSocketClient(threading.Thread):
 				if self.order_update_lock:
 					global GLOBAL_VERIFICATION_LOCK
 					GLOBAL_VERIFICATION_LOCK = False
+					logging.debug('GVL False.')
 			else:
 				order_representation = OrderRepresentation(None)
 				order_representation.order_id = resp_factory_object.order_id
@@ -231,7 +239,7 @@ class BitfinexWebSocketClient(threading.Thread):
 				self.active_orders[order_representation.order_id] = order_representation
 				global GLOBAL_VERIFICATION_LOCK
 				GLOBAL_VERIFICATION_LOCK = False
-				print('GVL is False.')
+				logging.debug('GVL False.')
 
 	def run(self):
 		while True:

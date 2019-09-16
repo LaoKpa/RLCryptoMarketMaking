@@ -1,6 +1,7 @@
 
 import time as tm
 
+import logging
 import tabulate as tb
 
 import bitfinex as bt
@@ -10,6 +11,8 @@ import bitfinex_web_socket_auth as bwsa
 
 ONE_PRECISION_POINT = 0.0001
 SIDE_PRICE_DIFF_DICT = {'ask': -1, 'bid': 1}
+
+logging.basicConfig(filename='basic_market_making.log',level=logging.DEBUG)
 
 def generic_find(l, lam):
     for i in range(len(l)):
@@ -87,6 +90,7 @@ class BasicMarketMakingStrategy(object):
         self.pricing_model = BasicMarketMakingPricingModel(ONE_PRECISION_POINT, amount)
         while True:
             tm.sleep(0.1)
+            logging.debug('Start of market making loop.')
             p_a_h = self.get_current_price('ask')
             p_b_h = self.get_current_price('bid')
             p_a_e = self.bitfinex_websocket_client.active_orders[order_id_ask].exec_price
@@ -98,11 +102,16 @@ class BasicMarketMakingStrategy(object):
             print(order_update_dict)
             ask_order_finished = self.bitfinex_websocket_client.active_orders[order_id_ask].amount == 0
             bid_order_finished = self.bitfinex_websocket_client.active_orders[order_id_bid].amount == 0
+            logging.debug('Ask amount left: {0}'.format(self.bitfinex_websocket_client.active_orders[order_id_ask].amount))
+            logging.debug('Bid amount left: {0}'.format(self.bitfinex_websocket_client.active_orders[order_id_bid].amount))
             if not ask_order_finished:
+                logging.debug('Update order ask.')
                 self.update_order(order_id_ask, order_update_dict['ask']['amount'], order_update_dict['ask']['price'], 'ask')
             if not bid_order_finished:
+                logging.debug('Update order bid.')
                 self.update_order(order_id_bid, order_update_dict['bid']['amount'], order_update_dict['bid']['price'], 'bid')
             if ask_order_finished and bid_order_finished:
+                logging.debug('Finish.')
                 return True
 
 class BasicMarketMakingPricingModel(object):
