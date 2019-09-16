@@ -26,11 +26,12 @@ def main():
     dollar_amount = 10
     req_spread_percntage = 0.002
     basic_market_making_strategy = bmms.BasicMarketMakingStrategy(symbol, req_spread_percntage, dollar_amount)
-    tm.sleep(10)
-    print('c')
-    # basic_market_making_strategy.start_strategy_routine()
-    basic_market_making_strategy.release_resources()
-    print('d')
+    while True:
+        print('Starting Market Making Strategy.')
+        basic_market_making_strategy.start_strategy_routine()
+        print('Strategy Completed Successfully.')
+        basic_market_making_strategy.release_resources()
+        print('Releasing Resources.')
 
 if __name__ == '__main__':
     main()

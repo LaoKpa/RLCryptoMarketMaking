@@ -65,7 +65,7 @@ class BasicMarketMakingStrategy(object):
     def update_order(self, order_id, amount, price, side):
         amount = SIDE_PRICE_DIFF_DICT[side] * amount
         if not self.bitfinex_websocket_client.update_order(order_id, amount, price):
-            raise Exception('Unsuccessful order update.')
+            print('Unsuccessful order update.')
 
     def get_current_price(self, side):
         price_index = 0

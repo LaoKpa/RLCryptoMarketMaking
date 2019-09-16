@@ -13,7 +13,6 @@ def profit_from_past_trades(past_trades):
             sell_amount += float(trade['price']) * float(trade['amount'])
         fee_amount += float(trade['fee_amount'])
     profit = sell_amount - buy_amount + fee_amount
-    import pudb; pudb.set_trace()
     return {'profit':profit, 'buy_volume':buy_amount, 'sell_volume':sell_amount, 'fee':fee_amount}
 
 def generate_timestamps():
