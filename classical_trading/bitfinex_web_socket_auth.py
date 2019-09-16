@@ -103,6 +103,8 @@ class BitfinexWebSocketClient(threading.Thread):
 		self.order_stream_stack = []
 		self.order_stream_update_stack = []
 		self.active_orders = {}
+		self.keep_running = True
+		self.is_stopped = False
 
 	def get_order_representation(self, order_id):
 		return self.active_orders[order_id]
@@ -240,9 +242,14 @@ class BitfinexWebSocketClient(threading.Thread):
 				global GLOBAL_VERIFICATION_LOCK
 				GLOBAL_VERIFICATION_LOCK = False
 				logging.debug('GVL False.')
-
+	
+	def close_thread(self):
+		self.keep_running = False
+		while not self.is_stopped:
+			pass
+	
 	def run(self):
-		while True:
+		while self.keep_running:
 			resp = self.websocket_connection.recv()
 			if not resp == BITFINEX_HEART_BEAT:
 				resp_python_object = json.loads(resp)
@@ -265,6 +272,7 @@ class BitfinexWebSocketClient(threading.Thread):
 				elif type(resp_factory_object) is OrderStreamUpdateParser:
 					self.order_stream_update_stack.append(resp_factory_object)
 					self.process_order_update(resp_factory_object)
+		self.is_stopped = True
 
 def get_authenticated_client():
 	bwsc = BitfinexWebSocketClient(BITFINEX_KEY, BITFINEX_SECRET, NONCE_FACTOR, BITFINEX_API_URL)

@@ -132,6 +132,8 @@ class WebSocketThread(threading.Thread):
         while not len(self.res_list) >= length:
             pass
         return None
+    def close_thread(self):
+       self.ws.keep_running = False
     def run(self):
        self.ws.run_forever()
 
@@ -143,10 +145,20 @@ class OrderBookThread(threading.Thread):
         self.wst.wait_for_capacity(3)
         raw_socket_data = self.wst.get_update_by_index(2)
         self.wsob = WebSocketOrderBook(raw_socket_data)
+        self.keep_running = True
+        self.is_stopped = False
+
+    def close_thread(self):
+        self.keep_running = False
+        while not self.is_stopped:
+            pass
+
     def run(self):
-        while True:
+        while self.keep_running:
             resp = self.wst.wait_for_next_update()
             self.wsob.update_book(json.loads(resp))
+        self.wst.close_thread()
+        self.is_stopped = True
 
 def print_order_book(ob):
     print(tb.tabulate([[a,b] for (a, b) in zip(ob.ask, ob.bid)], headers=['Ask', 'Bid']))

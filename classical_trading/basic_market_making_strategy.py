@@ -79,6 +79,10 @@ class BasicMarketMakingStrategy(object):
         else:
             return current_book_dict[first_in_line_precedence][price_index]
 
+    def release_resources(self):
+        self.order_book.close_thread()
+        self.bitfinex_websocket_client.close_thread()
+
     def start_strategy_routine(self):
         price_dict = self.get_current_price_dict()
         price = (price_dict['ask'] + price_dict['bid']) / 2
@@ -112,6 +116,7 @@ class BasicMarketMakingStrategy(object):
                 self.update_order(order_id_bid, order_update_dict['bid']['amount'], order_update_dict['bid']['price'], 'bid')
             if ask_order_finished and bid_order_finished:
                 logging.debug('Finish.')
+                self.release_resources()
                 return True
 
 class BasicMarketMakingPricingModel(object):
