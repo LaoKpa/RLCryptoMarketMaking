@@ -25,9 +25,9 @@ def main():
     symbol = sys.argv[1]
     dollar_amount = 10
     req_spread_percntage = 0.002
-    basic_market_making_strategy = bmms.BasicMarketMakingStrategy(symbol, req_spread_percntage, dollar_amount)
     while True:
         print('Starting Market Making Strategy.')
+        basic_market_making_strategy = bmms.BasicMarketMakingStrategy(symbol, req_spread_percntage, dollar_amount)
         basic_market_making_strategy.start_strategy_routine()
         print('Strategy Completed Successfully.')
         basic_market_making_strategy.release_resources()
