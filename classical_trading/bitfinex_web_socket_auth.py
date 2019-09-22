@@ -205,6 +205,7 @@ class BitfinexWebSocketClient(threading.Thread):
 		return request_confirmation_success
 
 	def process_order_update(self, resp_factory_object):
+		global GLOBAL_VERIFICATION_LOCK
 		if type(resp_factory_object) is TradeUpdateParser:
 			if resp_factory_object.order_id in self.active_orders.keys():
 				self.active_orders[resp_factory_object.order_id].chanle_id = resp_factory_object.chanle_id
@@ -222,7 +223,6 @@ class BitfinexWebSocketClient(threading.Thread):
 			if resp_factory_object.order_id in self.active_orders.keys():
 				self.active_orders[resp_factory_object.order_id].is_active += [resp_factory_object.status_dictionaty]
 				if self.order_update_lock:
-					global GLOBAL_VERIFICATION_LOCK
 					GLOBAL_VERIFICATION_LOCK = False
 					logging.debug('GVL False.')
 			else:
@@ -241,7 +241,6 @@ class BitfinexWebSocketClient(threading.Thread):
 				order_representation.fee_currnecy = ''
 				order_representation.maker = []
 				self.active_orders[order_representation.order_id] = order_representation
-				global GLOBAL_VERIFICATION_LOCK
 				GLOBAL_VERIFICATION_LOCK = False
 				logging.debug('GVL False.')
 	
