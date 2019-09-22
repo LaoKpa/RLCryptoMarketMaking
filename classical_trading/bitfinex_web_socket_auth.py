@@ -47,6 +47,7 @@ class ResponseObjectFactory(object):
 				if is_active == 'ACTIVE':
 					return OrderConfirmationParser(resp)
 				else:
+					import pdb; pdb.set_trace()
 					raise Exception('New order non active status!')
 			elif 'oc' in resp:
 				is_active = resp[2][13]
