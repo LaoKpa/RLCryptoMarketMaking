@@ -24,13 +24,10 @@ def parse_update_status(order_status_string):
 			executed_amount, executed_price, order_status_status = parse_splitted_order_status(splitted_order_status)
 			return {'executed_amount':executed_amount, 'executed_price':executed_price, 'order_status_status':order_status_status}
 		if 'EXECUTED' in order_status_string and 'PARTIALLY' in order_status_string and 'was' in order_status_string:
-			'''
-				A problem occurs when a partial execution is immidiately followed by a full execution.
-			'''
-			import pdb; pdb.set_trace()
 			if len([ i for i in order_status_string if i == ':']) == 1:
 				splitted_order_status, _ = order_status_string.replace(' ', '').split(':')
 			else:
+				import pdb; pdb.set_trace()
 				splitted_order_status, _, _ = order_status_string.replace(' ', '').split(':')
 			executed_amount, executed_price, order_status_status = parse_splitted_order_status(splitted_order_status)
 			return {'executed_amount':executed_amount, 'executed_price':executed_price, 'order_status_status':order_status_status}

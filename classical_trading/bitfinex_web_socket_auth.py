@@ -169,8 +169,20 @@ class BitfinexWebSocketClient(threading.Thread):
 				return True, order_representation.order_id
 			return False, None
 
+	def get_update_order_query(self, ord_id, amount, price):
+		if not (amount == 0 and price == 0):
+			if amount == 0:
+				return [0, 'ou', None, {'id': ord_id, 'price': str(price)}]
+			elif price == 0:
+				return [0, 'ou', None, {'id': ord_id, 'amount': str(amount)}]
+			else:
+				return [0, 'ou', None, {'id': ord_id, 'amount': str(amount), 'price': str(price)}]
+		else:
+			import pdb; pdb.set_trace()
+			return None
+
 	def update_order(self, ord_id, amount, price):
-		update_order_query = [0, 'ou', None, {'id': ord_id, 'amount': str(amount), 'price': str(price)}]
+		update_order_query = self.get_update_order_query(ord_id, amount, price)
 		self.websocket_connection.send(json.dumps(update_order_query))
 		self.order_update_lock = True
 		logging.debug('Update order verify response start.')
@@ -282,4 +294,5 @@ def get_authenticated_client():
 	if bwsc.authenticate():
 		return bwsc
 	else:
+		import pdb; pdb.set_trace()
 		raise Exception('Bitfinex Web Socket Client Authenticatoin Error.')

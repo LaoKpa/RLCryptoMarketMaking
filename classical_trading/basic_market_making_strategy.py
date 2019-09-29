@@ -9,7 +9,7 @@ import highest_spread_symbols as hss
 import bitfinex_order_book_construction as bobc
 import bitfinex_web_socket_auth as bwsa
 
-ONE_PRECISION_POINT = 0.0001
+ONE_PRECISION_POINT = 0.00001
 SIDE_PRICE_DIFF_DICT = {'ask': -1, 'bid': 1}
 
 logging.basicConfig(filename='basic_market_making.log',level=logging.DEBUG)
@@ -83,17 +83,36 @@ class BasicMarketMakingStrategy(object):
         self.order_book.close_thread()
         self.bitfinex_websocket_client.close_thread()
 
+    def order_update_dif(self, tmp_order_update_dict, order_update_dict):
+        if order_update_dict['ask']['price'] == tmp_order_update_dict['ask']['price']:
+            ask_order_price = 0
+        else:
+            ask_order_price = order_update_dict['ask']['price']
+        if order_update_dict['ask']['amount'] == tmp_order_update_dict['ask']['amount']:
+            ask_order_amount = 0
+        else:
+            ask_order_amount = order_update_dict['ask']['amount']
+        if order_update_dict['bid']['price'] == tmp_order_update_dict['bid']['price']:
+            bid_order_price = 0
+        else:
+            bid_order_price = order_update_dict['bid']['price']
+        if order_update_dict['bid']['amount'] == tmp_order_update_dict['bid']['amount']:
+            bid_order_amount = 0
+        else:
+            bid_order_amount = order_update_dict['bid']['amount']
+        return {'ask':{'price':ask_order_price, 'amount':ask_order_amount}, 'bid':{'price':bid_order_price, 'amount':bid_order_amount}}
+
     def start_strategy_routine(self):
         price_dict = self.get_current_price_dict()
         price = (price_dict['ask'] + price_dict['bid']) / 2
         amount = self.dollar_amount / price
         order_id_ask = self.initiate_order(amount, 'ask')
         order_id_bid = self.initiate_order(amount, 'bid')
+        order_update_dict = {'ask':{'price':0, 'amount':0}, 'bid':{'price':0, 'amount':0}}
         s_t = self.req_spread_percntage * price
         r_t = s_t * amount
         self.pricing_model = BasicMarketMakingPricingModel(ONE_PRECISION_POINT, amount)
         while True:
-            tm.sleep(0.1)
             logging.debug('Start of market making loop.')
             p_a_h = self.get_current_price('ask')
             p_b_h = self.get_current_price('bid')
@@ -102,18 +121,22 @@ class BasicMarketMakingStrategy(object):
             a_e_a = self.bitfinex_websocket_client.active_orders[order_id_ask].exec_amount
             a_e_b = self.bitfinex_websocket_client.active_orders[order_id_bid].exec_amount
             print(tb.tabulate([['p_a_h', p_a_h],['p_b_h', p_b_h],['p_a_e', p_a_e],['p_b_e', p_b_e],['a_e_a', a_e_a],['a_e_b', a_e_b]]))
+            tmp_order_update_dict = order_update_dict
             order_update_dict = self.pricing_model.get_updated_order_prices(s_t, r_t, p_a_h, p_b_h, p_a_e, p_b_e, abs(a_e_a), abs(a_e_b))
             print(order_update_dict)
-            ask_order_finished = self.bitfinex_websocket_client.active_orders[order_id_ask].amount == 0
-            bid_order_finished = self.bitfinex_websocket_client.active_orders[order_id_bid].amount == 0
+            ask_order_finished = abs(self.bitfinex_websocket_client.active_orders[order_id_ask].amount) < 0.0000001
+            bid_order_finished = abs(self.bitfinex_websocket_client.active_orders[order_id_bid].amount) < 0.0000001
             logging.debug('Ask amount left: {0}'.format(self.bitfinex_websocket_client.active_orders[order_id_ask].amount))
             logging.debug('Bid amount left: {0}'.format(self.bitfinex_websocket_client.active_orders[order_id_bid].amount))
+            revised_order_update_dict = self.order_update_dif(tmp_order_update_dict, order_update_dict)
             if not ask_order_finished:
                 logging.debug('Update order ask.')
-                self.update_order(order_id_ask, order_update_dict['ask']['amount'], order_update_dict['ask']['price'], 'ask')
+                if not (revised_order_update_dict['ask']['amount'] == 0 and revised_order_update_dict['ask']['price'] == 0):
+                    self.update_order(order_id_ask, revised_order_update_dict['ask']['amount'], revised_order_update_dict['ask']['price'], 'ask')
             if not bid_order_finished:
                 logging.debug('Update order bid.')
-                self.update_order(order_id_bid, order_update_dict['bid']['amount'], order_update_dict['bid']['price'], 'bid')
+                if not (revised_order_update_dict['bid']['amount'] == 0 and revised_order_update_dict['bid']['price'] == 0):
+                    self.update_order(order_id_bid, revised_order_update_dict['bid']['amount'], revised_order_update_dict['bid']['price'], 'bid')
             if ask_order_finished and bid_order_finished:
                 logging.debug('Finish.')
                 self.release_resources()

@@ -24,7 +24,7 @@ import basic_market_making_strategy as bmms
 def main():
     symbol = sys.argv[1]
     dollar_amount = 10
-    req_spread_percntage = 0.002
+    req_spread_percntage = 0.003
     while True:
         print('Starting Market Making Strategy.')
         basic_market_making_strategy = bmms.BasicMarketMakingStrategy(symbol, req_spread_percntage, dollar_amount)
