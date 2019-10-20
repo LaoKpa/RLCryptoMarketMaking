@@ -4,7 +4,6 @@ import time as tm
 import pickle as pk
 import threading
 import numpy as np
-import gym
 
 from multiprocessing import Process, Manager, Lock
 import multiprocessing as mp
