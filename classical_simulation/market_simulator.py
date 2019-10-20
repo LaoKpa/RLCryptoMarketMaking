@@ -161,7 +161,6 @@ class OrderBook(object):
         return my_transaction_list
 
     def make_step(self):
-        done = False
         if self.next_order_book[ASKS_INDEX][0][TIMESTAMP_INDEX] == self.timestamp:
             self.current_order_book = self.next_order_book
             self.next_order_book = self.order_book_data_conveyer.get_next_sample()
@@ -172,10 +171,6 @@ class OrderBook(object):
         if self.timestamp > self.trades[self.trade_count][TIMESTAMP_INDEX]:
             raise Exception()
         self.timestamp += 1
-        if self.get_net_worth() <= 0:
-            # import pdb; pdb.set_trace()
-            done = True
-        return done
 
     def update_state(self, list_of_transactions):
         for transaction in list_of_transactions:
@@ -246,7 +241,10 @@ class OrderBookTransformator(object):
         self.alterations_list = []
 
 class MarketMakingGame(object):
-    def __init__(self, config_file_path, config_name, order_book_data_conveyer, trades):
+    def __init__(self, config_file_path, config_name, order_book_data_file_path, num_of_buffer_samples, trades_file_path):
+        with open(trades_file_path, 'rb') as fh:
+            trades = np.load(fh)
+        order_book_data_conveyer = self.get_data_conveyer(order_book_data_file_path, num_of_buffer_samples)
         self.order_book = OrderBook(config_file_path, config_name, order_book_data_conveyer, trades)
         self.bots_ask_price = self.order_book.get_current_ask_price()
         self.bots_bid_price = self.order_book.get_current_bid_price()
@@ -256,12 +254,18 @@ class MarketMakingGame(object):
         self.order_index = None
         self.count = 0
 
-    def get_data_conveyer(order_book_data_file_path, num_of_buffer_samples):
+    def get_data_conveyer(self, order_book_data_file_path, num_of_buffer_samples):
         dr = DataReader(order_book_data_file_path)
         dc = DataConveyer(dr.load_data(num_of_buffer_samples))
         return dc
+    
+    def get_status(self):
+        net_worth = self.order_book.get_net_worth()
+        bid_price = self.order_book.get_current_bid_price()
+        ask_price = self.order_book.get_current_ask_price()
+        return {'net_worth':net_worth, 'bid_price':bid_price, 'ask_price':ask_price}
 
-    def make_action(self, ask_price, ask_amount, bid_price, bid_amount):
+    def place_limit_order(self, price, amount):
         self.bots_ask_price, self.bots_bid_price, self.bots_ask_amount, self.bots_bid_amount = ask_price, bid_price, ask_amount, bid_amount
         ask_order, bid_order = [(self.bots_ask_price, self.bots_ask_amount, TRADE_SELL_INDEX), (self.bots_bid_price, self.bots_bid_amount, TRADE_BUY_INDEX)]
         if self.order_index != None:
@@ -289,8 +293,7 @@ class MarketMakingGame(object):
         else:
             bid_order_index = 0
         self.order_index = {'ask':ask_order_index, 'bid':bid_order_index}
-        step_done = self.order_book.make_step()
+        self.order_book.make_step()
 
     def make_empty_action(self):
         self.order_book.make_step()
- 
