@@ -246,10 +246,6 @@ class MarketMakingGame(object):
             trades = np.load(fh)
         order_book_data_conveyer = self.get_data_conveyer(order_book_data_file_path, num_of_buffer_samples)
         self.order_book = OrderBook(config_file_path, config_name, order_book_data_conveyer, trades)
-        self.bots_ask_price = self.order_book.get_current_ask_price()
-        self.bots_bid_price = self.order_book.get_current_bid_price()
-        self.bots_ask_amount = self.order_book.get_net_worth() / self.order_book.get_current_price() * 0.1
-        self.bots_bid_amount = self.order_book.get_net_worth() / self.order_book.get_current_price() * 0.1
         self.margin_coef = self.order_book.config.margin_coef
         self.order_index = None
         self.count = 0
@@ -263,36 +259,26 @@ class MarketMakingGame(object):
         net_worth = self.order_book.get_net_worth()
         bid_price = self.order_book.get_current_bid_price()
         ask_price = self.order_book.get_current_ask_price()
-        return {'net_worth':net_worth, 'bid_price':bid_price, 'ask_price':ask_price}
+        price = (ask_price + bid_price) / 2
+        return {'net_worth':net_worth, 'bid_price':bid_price, 'ask_price':ask_price, 'price':price}
 
     def place_limit_order(self, price, amount):
-        self.bots_ask_price, self.bots_bid_price, self.bots_ask_amount, self.bots_bid_amount = ask_price, bid_price, ask_amount, bid_amount
-        ask_order, bid_order = [(self.bots_ask_price, self.bots_ask_amount, TRADE_SELL_INDEX), (self.bots_bid_price, self.bots_bid_amount, TRADE_BUY_INDEX)]
-        if self.order_index != None:
-            self.count = 1
-            if not self.order_index['ask'] == 0:
-                self.order_book.order_book_transformer.delete_order(self.order_index['ask'])
-            if not self.order_index['bid'] == 0:
-                self.order_book.order_book_transformer.delete_order(self.order_index['bid'])
-        else:
-            if self.count > 0:
-                import pdb; pdb.set_trace()
+        self.price, self.amount = price, amount
+        limit_order = (price, amount, {True:TRADE_BUY_INDEX, False:TRADE_SELL_INDEX}[amount>0])
         portfolio_net_worth = self.order_book.get_net_worth()
         inventory = self.order_book.state_space.inventory
         price = self.order_book.get_current_price()
-        ask_amount = ask_order[1]
-        bid_amount = bid_order[1]
-        ask_margin_condition = -1 * (inventory - ask_amount) * price / portfolio_net_worth < self.margin_coef
-        bid_margin_condition = (inventory + bid_amount) * price / portfolio_net_worth < self.margin_coef
-        if ask_margin_condition:
-            ask_order_index = self.order_book.order_book_transformer.add_order(ask_order[0], ask_order[1], ask_order[2])
+        if amount > 0:
+            margin_condition = (inventory + amount) * price / portfolio_net_worth < self.margin_coef
         else:
-            ask_order_index = 0
-        if bid_margin_condition:
-            bid_order_index = self.order_book.order_book_transformer.add_order(bid_order[0], bid_order[1], bid_order[2])
+            margin_condition = -1 * (inventory - amount) * price / portfolio_net_worth < self.margin_coef
+        
+        if margin_condition:
+            order_index = self.order_book.order_book_transformer.add_order(limit_order[0], limit_order[1], limit_order[2])
         else:
-            bid_order_index = 0
-        self.order_index = {'ask':ask_order_index, 'bid':bid_order_index}
+            order_index = 0
+            print('Margin Condition Not Met.')
+        self.order_index = order_index
         self.order_book.make_step()
 
     def make_empty_action(self):

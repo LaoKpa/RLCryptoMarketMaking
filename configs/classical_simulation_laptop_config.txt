@@ -1,0 +1,12 @@
+[MARKET_MAKING_CONFIG]
+order_book_file = /home/lavi/Documents/RLMM/data_sets/zec/ob_zec_normalized.bin
+trades_file = /home/lavi/Documents/RLMM/data_sets/zec/tr_zec_unified_numpy.bin
+order_book_base_path = /home/lavi/Documents/RLMM/data_sets/zec/ob_zec_normalized_parted_numpy_0.bin
+
+max_funds = 10000.0
+initial_investment = 1000.0
+margin_coef = 2
+
+dep_num_of_order_book_entries = 25
+dep_order_book_entrie_rep_dim = 5
+dep_num_of_buffer_samples = 79600
